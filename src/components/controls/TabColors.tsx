@@ -1,0 +1,106 @@
+import { useConverterStore } from '@/store/converterStore';
+import { useTranslation } from '@/hooks/useTranslation';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DEFAULT_SETTINGS } from '@/types';
+
+interface SliderControlProps {
+  label: string;
+  value: number;
+  defaultValue: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  step: number;
+  format?: (v: number) => string;
+}
+
+function SliderControl({ label, value, defaultValue, onChange, min, max, step, format }: SliderControlProps) {
+  const isChanged = Math.abs(value - defaultValue) > step * 0.5;
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-1.5">
+        <div className="flex items-center gap-1.5">
+          {isChanged && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+          <Label className="text-[11px]">{label}</Label>
+        </div>
+        <button
+          className="text-[11px] text-muted-foreground font-mono tabular-nums hover:text-primary transition-colors"
+          onClick={() => onChange(defaultValue)}
+          title="Double-click to reset"
+        >
+          {format ? format(value) : value.toFixed(2)}
+        </button>
+      </div>
+      <Slider
+        value={[value]}
+        onValueChange={(val) => onChange(Array.isArray(val) ? val[0] : val)}
+        min={min}
+        max={max}
+        step={step}
+      />
+    </div>
+  );
+}
+
+export function TabColors() {
+  const { t } = useTranslation();
+  const settings = useConverterStore((s) => s.settings);
+  const updateSettings = useConverterStore((s) => s.updateSettings);
+  const d = DEFAULT_SETTINGS;
+
+  return (
+    <div className="space-y-5">
+      <SliderControl label={t('colors.brightness')} value={settings.brightness} defaultValue={d.brightness}
+        onChange={(v) => updateSettings({ brightness: v })} min={-1} max={1} step={0.01} />
+      <SliderControl label={t('colors.contrast')} value={settings.contrast} defaultValue={d.contrast}
+        onChange={(v) => updateSettings({ contrast: v })} min={0} max={3} step={0.01} />
+      <SliderControl label={t('colors.saturation')} value={settings.saturation} defaultValue={d.saturation}
+        onChange={(v) => updateSettings({ saturation: v })} min={0} max={3} step={0.01} />
+      <SliderControl label={t('colors.hue')} value={settings.hue} defaultValue={d.hue}
+        onChange={(v) => updateSettings({ hue: v })} min={-180} max={180} step={1}
+        format={(v) => `${v}°`} />
+      <SliderControl label={t('colors.gamma')} value={settings.gamma} defaultValue={d.gamma}
+        onChange={(v) => updateSettings({ gamma: v })} min={0.1} max={3} step={0.01} />
+
+      <div className="pt-3 border-t border-border space-y-5">
+        <Label className="text-[11px] text-muted-foreground/70 uppercase tracking-wider">{t('colors.tint')}</Label>
+        <SliderControl label={t('colors.red')} value={settings.tintRed} defaultValue={d.tintRed}
+          onChange={(v) => updateSettings({ tintRed: v })} min={0} max={255} step={1}
+          format={(v) => String(Math.round(v))} />
+        <SliderControl label={t('colors.green')} value={settings.tintGreen} defaultValue={d.tintGreen}
+          onChange={(v) => updateSettings({ tintGreen: v })} min={0} max={255} step={1}
+          format={(v) => String(Math.round(v))} />
+        <SliderControl label={t('colors.blue')} value={settings.tintBlue} defaultValue={d.tintBlue}
+          onChange={(v) => updateSettings({ tintBlue: v })} min={0} max={255} step={1}
+          format={(v) => String(Math.round(v))} />
+      </div>
+
+      {/* CRT Effect */}
+      <div className="pt-3 border-t border-border space-y-5">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="crt-enabled"
+            checked={settings.crtEnabled}
+            onCheckedChange={(v) => updateSettings({ crtEnabled: !!v })}
+          />
+          <Label htmlFor="crt-enabled" className="text-[11px] uppercase tracking-wider text-muted-foreground/70">{t('colors.crt')}</Label>
+        </div>
+
+        {settings.crtEnabled && (
+          <>
+            <SliderControl label={t('colors.scanlines')} value={settings.crtScanlines} defaultValue={d.crtScanlines}
+              onChange={(v) => updateSettings({ crtScanlines: v })} min={0} max={0.5} step={0.01} />
+            <SliderControl label={t('colors.rgbShift')} value={settings.crtRgbShift} defaultValue={d.crtRgbShift}
+              onChange={(v) => updateSettings({ crtRgbShift: v })} min={0} max={5} step={0.1}
+              format={(v) => `${v.toFixed(1)}px`} />
+            <SliderControl label={t('colors.vignette')} value={settings.crtVignette} defaultValue={d.crtVignette}
+              onChange={(v) => updateSettings({ crtVignette: v })} min={0} max={0.8} step={0.01} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

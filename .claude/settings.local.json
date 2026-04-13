@@ -3,7 +3,29 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(npx shadcn@latest init -d --defaults)",
-      "Bash(npx shadcn@latest init -d)"
+      "Bash(npx shadcn@latest init -d)",
+      "Bash(npx shadcn@latest add slider select tabs dialog card badge label checkbox input separator scroll-area tooltip -y)",
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const iq = require\\('image-q'\\); console.log\\(Object.keys\\(iq.palette\\)\\); console.log\\(Object.keys\\(iq.image\\)\\); console.log\\(Object.keys\\(iq.distance\\)\\); const p = new iq.utils.Palette\\(\\); console.log\\(Object.getOwnPropertyNames\\(Object.getPrototypeOf\\(p\\)\\)\\);\")",
+      "Bash(node -e ':*)",
+      "Bash(npx vite:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl -s http://localhost:5174/)",
+      "WebSearch",
+      "WebFetch(domain:pixelorama.org)",
+      "Bash(curl:*)",
+      "Bash(npm show:*)",
+      "Bash(npx bundlephobia-cli:*)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'comlink: {d[\\\\\"gzip\\\\\"]/1024:.1f}KB gzip, published {d[\\\\\"publishedAt\\\\\"][:10]}'\\)\")",
+      "WebFetch(domain:bundlephobia.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:bundlejs.com)",
+      "WebFetch(domain:www.pkgpulse.com)",
+      "Bash(npm info:*)",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const j=JSON.parse\\(d\\); console.log\\('version:',j.version,'|','time latest:',j.time?.latest,'|','unpacked size:',j.dist?.unpackedSize,'|','dist size:',j.dist?.fileCount\\)\")",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:socket.dev)",
+      "WebFetch(domain:snyk.io)"
     ]
   }
 }
