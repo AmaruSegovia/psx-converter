@@ -2,24 +2,6 @@
 
 Una herramienta en el navegador para convertir imágenes en **texturas pixel art estilo PlayStation 1** — completamente del lado del cliente, sin subidas, sin backend.
 
-## Características
-
-- **Preview en tiempo real** — respuesta instantánea al mover cualquier slider (basado en rAF, sin lag)
-- **Tab Resize** — tamaño absoluto (px) o relativo (%), bloqueo de aspecto, blur/sharpen
-- **Tab Dither** — dithering Floyd-Steinberg y Jarvis, cantidad configurable, múltiples métricas de distancia (Euclidiana, Manhattan, CIEDE2000, RGB Redmean)
-- **Tab Palette** — cuantización K-Means / Wu, paletas personalizadas con selector de color react-colorful, API EyeDropper, importación de paletas desde Lospec por URL o slug
-- **Tab Colors** — brillo, contraste, saturación, hue, gamma, canales de tinte RGB, filtro CRT (scanlines, RGB shift, viñeta)
-- **Modos de comparación** — slider de superposición o vista lado a lado
-- **Deshacer/Rehacer** — Ctrl+Z/Y con línea de tiempo visual del historial, click en cualquier punto para ir a ese estado
-- **Presets** — guardar y cargar presets de configuración con nombre (almacenados en localStorage)
-- **Nombre de archivo inteligente** — el PNG exportado usa el nombre original + dimensiones (ej: `hero_psx_128x128.png`)
-- **Exportación en lote** — descarga múltiples resoluciones de una vez (32, 64, 128, 256, 512px o personalizada)
-- **Copiar al portapapeles** — Ctrl+C copia el resultado como PNG
-- **Drag & drop** — arrastra imágenes al canvas para cargar o reemplazar
-- **Atajos de teclado** — presiona `?` para ver todos los atajos
-- **EN / ES** — traducciones completas en inglés y español
-- **Sin servidor** — todo el procesamiento ocurre en tu navegador vía Canvas 2D API
-
 ## Tecnologías
 
 | Librería | Rol |
