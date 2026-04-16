@@ -2,7 +2,7 @@
 
 Convertí cualquier imagen en una **textura pixel art estilo PlayStation 1** directamente en el navegador. Dithering, cuantización de paleta, efecto CRT, grano de película, niveles, presets y exportación — todo en tiempo real, sin subir nada a ningún servidor.
 
-**→ Probalo online: [amarusegovia.github.io/psx-converter](https://amarusegovia.github.io/psx-converter/)**
+**→ Probalo online gratis: [amarusegovia.github.io/psx-converter](https://amarusegovia.github.io/psx-converter/)**
 
 No hace falta instalar nada. Tu imagen nunca sale de tu navegador.
 
