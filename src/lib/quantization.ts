@@ -83,7 +83,8 @@ export default async function quantizeImage(
   imageData: ImageData,
   settings: Pick<ConverterSettings,
     'colorCount' | 'ditherMode' | 'ditherAmount' |
-    'distanceMetric' | 'palette' | 'useKMeansPlusPlus' | 'alphaThreshold'>
+    'distanceMetric' | 'palette' | 'useKMeansPlusPlus' | 'alphaThreshold'>,
+  opts: { frozenPalette?: PaletteColor[] } = {}
 ): Promise<{ imageData: ImageData; generatedPalette: PaletteColor[] }> {
   // Capture original alpha channel — image-q returns alpha=255 for all pixels
   const pixelCount = imageData.width * imageData.height;
@@ -105,6 +106,9 @@ export default async function quantizeImage(
 
   if (settings.palette.length > 0) {
     palette = createPaletteFromColors(settings.palette);
+  } else if (opts.frozenPalette && opts.frozenPalette.length > 0) {
+    // Fast path: skip sampling, reuse palette from a prior full pass.
+    palette = createPaletteFromColors(opts.frozenPalette);
   } else {
     const paletteQuantizer = settings.useKMeansPlusPlus
       ? new iq.palette.WuQuant(distanceCalculator, settings.colorCount)

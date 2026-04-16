@@ -315,12 +315,40 @@ function getTargetDimensions(
 // the size slider. Full pipeline still runs at user's real target after debounce.
 const FAST_PREVIEW_MAX_DIM = 512;
 
-/** Fast preview: resize FIRST, then color adjustments on small canvas. No quantization, no base64. */
+// --- Fast preview intermediate cache ---
+// Expensive pipeline stages cached per input-signature. When the user drags a
+// slider that only affects stage N, stages 1..N-1 are reused.
+type StageCacheEntry = { key: string; canvas: HTMLCanvasElement };
+const _pipelineCache: {
+  sourceRef: HTMLCanvasElement | null;
+  stage2: StageCacheEntry | null; // after resize + blur
+  stage3: StageCacheEntry | null; // after transparency/levels/color/grain
+  stage4: StageCacheEntry | null; // after sharpen
+} = { sourceRef: null, stage2: null, stage3: null, stage4: null };
+
+function invalidateCacheIfSourceChanged(source: HTMLCanvasElement) {
+  if (_pipelineCache.sourceRef !== source) {
+    _pipelineCache.sourceRef = source;
+    _pipelineCache.stage2 = null;
+    _pipelineCache.stage3 = null;
+    _pipelineCache.stage4 = null;
+  }
+}
+
+export interface FastPreviewOpts {
+  /** True while a slider is being dragged. Skips sharpen and CRT to stay under frame budget. */
+  dragActive?: boolean;
+}
+
+/** Fast preview with per-stage memoization. No quantization, no base64. */
 export function processFastPreview(
   sourceCanvas: HTMLCanvasElement,
-  settings: ConverterSettings
+  settings: ConverterSettings,
+  opts: FastPreviewOpts = {}
 ): HTMLCanvasElement {
-  // 1. Resize first (512→128 = 16K pixels instead of 262K)
+  const { dragActive = false } = opts;
+  invalidateCacheIfSourceChanged(sourceCanvas);
+
   let { w, h } = getTargetDimensions(sourceCanvas, settings);
   const maxSide = Math.max(w, h);
   if (maxSide > FAST_PREVIEW_MAX_DIM) {
@@ -328,34 +356,86 @@ export function processFastPreview(
     w = Math.max(1, Math.round(w * scale));
     h = Math.max(1, Math.round(h * scale));
   }
-  let current = resizeImage(sourceCanvas, w, h, settings.sampleMode);
 
-  // 2. Blur on small canvas
-  current = applyBlur(current, settings.blurAmount);
+  // Stage 2: resize + blur
+  const stage2Key = `${w}|${h}|${settings.sampleMode}|${settings.blurAmount}`;
+  let stage2: HTMLCanvasElement;
+  if (_pipelineCache.stage2 && _pipelineCache.stage2.key === stage2Key) {
+    stage2 = _pipelineCache.stage2.canvas;
+  } else {
+    let c = resizeImage(sourceCanvas, w, h, settings.sampleMode);
+    c = applyBlur(c, settings.blurAmount);
+    stage2 = c;
+    _pipelineCache.stage2 = { key: stage2Key, canvas: c };
+  }
 
-  // 3. Transparency + levels + color adjustments + grain on small canvas (~16K pixels)
-  const colorData = canvasToImageData(current);
-  applyTransparency(colorData, settings);
-  applyLevels(colorData, settings);
-  applyColorAdjustments(colorData, settings);
-  applyGrain(colorData, settings.grainAmount);
-  current = imageDataToCanvas(colorData);
+  // Stage 3: transparency + levels + color + grain (pixel ops)
+  // Grain uses Math.random — cache only deterministic runs.
+  const canCache3 = settings.grainAmount === 0;
+  const s = settings;
+  const stage3Key = `${stage2Key}|${s.transparencyMode}|${s.alphaThreshold}|${s.colorKeyHex}|${s.levelsInLow}|${s.levelsInHigh}|${s.levelsOutLow}|${s.levelsOutHigh}|${s.brightness}|${s.contrast}|${s.saturation}|${s.hue}|${s.gamma}|${s.tintRed}|${s.tintGreen}|${s.tintBlue}|${s.posterize}|${s.grainAmount}`;
+  let stage3: HTMLCanvasElement;
+  if (canCache3 && _pipelineCache.stage3 && _pipelineCache.stage3.key === stage3Key) {
+    stage3 = _pipelineCache.stage3.canvas;
+  } else {
+    const data = canvasToImageData(stage2);
+    applyTransparency(data, settings);
+    applyLevels(data, settings);
+    applyColorAdjustments(data, settings);
+    applyGrain(data, settings.grainAmount);
+    stage3 = imageDataToCanvas(data);
+    _pipelineCache.stage3 = canCache3 ? { key: stage3Key, canvas: stage3 } : null;
+  }
 
-  // 4. Sharpen on small canvas
-  current = applySharpen(current, settings.sharpenAmount);
+  // Stage 4: sharpen (skipped during active drag — O(n*4) neighbor reads)
+  const effSharpen = dragActive ? 0 : settings.sharpenAmount;
+  const stage4Key = `${stage3Key}|${effSharpen}`;
+  let stage4: HTMLCanvasElement;
+  if (canCache3 && _pipelineCache.stage4 && _pipelineCache.stage4.key === stage4Key) {
+    stage4 = _pipelineCache.stage4.canvas;
+  } else {
+    stage4 = applySharpen(stage3, effSharpen);
+    _pipelineCache.stage4 = canCache3 ? { key: stage4Key, canvas: stage4 } : null;
+  }
 
-  // 5. CRT effect
-  if (settings.crtEnabled) {
+  // Stage 5: CRT (skipped during active drag — extra getImageData/putImageData pass)
+  if (!dragActive && settings.crtEnabled) {
     try {
-      current = applyCRTFilter(current, {
+      return applyCRTFilter(stage4, {
         scanlineIntensity: settings.crtScanlines,
         rgbShift: settings.crtRgbShift,
         vignette: settings.crtVignette,
       });
-    } catch { /* CRT failed, skip */ }
+    } catch (err) { console.warn('Fast-preview CRT failed:', err); }
   }
+  return stage4;
+}
 
-  return current;
+// --- Full pipeline quantization cache ---
+// Post-quant effects (CRT) depend only on the quantized output. When the user
+// only tweaks CRT, we skip the expensive quantize step by reusing the cached
+// quantized ImageData keyed on the full upstream signature.
+type QuantCacheEntry = {
+  key: string;
+  quantized: ImageData;
+  generatedPalette: import('@/types').PaletteColor[];
+};
+let _quantCache: QuantCacheEntry | null = null;
+let _quantCacheSource = '';
+
+function quantSignature(sourceBase64: string, s: ConverterSettings): string {
+  const palette = s.palette.map((c) => `${c.r},${c.g},${c.b}`).join(';');
+  return [
+    sourceBase64.length, // proxy — full source compared via _quantCacheSource
+    s.sizeMode, s.width, s.height, s.sampleMode,
+    s.blurAmount, s.sharpenAmount,
+    s.transparencyMode, s.alphaThreshold, s.colorKeyHex,
+    s.levelsInLow, s.levelsInHigh, s.levelsOutLow, s.levelsOutHigh,
+    s.brightness, s.contrast, s.saturation, s.hue, s.gamma,
+    s.tintRed, s.tintGreen, s.tintBlue, s.posterize, s.grainAmount,
+    s.colorCount, s.ditherMode, s.ditherAmount, s.distanceMetric,
+    s.useKMeansPlusPlus, palette,
+  ].join('|');
 }
 
 /** Full quality: everything including quantization. */
@@ -363,38 +443,58 @@ export async function processFullPipeline(
   sourceBase64: string,
   settings: ConverterSettings
 ): Promise<{ resultCanvas: HTMLCanvasElement; generatedPalette: import('@/types').PaletteColor[] }> {
-  const { default: quantizeImage } = await import('./quantization');
-
   const sourceCanvas = await getCachedSource(sourceBase64);
 
-  // Transparency + levels + color adjustments
-  const colorData = canvasToImageData(sourceCanvas);
-  applyTransparency(colorData, settings);
-  applyLevels(colorData, settings);
-  applyColorAdjustments(colorData, settings);
-  let current = imageDataToCanvas(colorData);
+  const sig = quantSignature(sourceBase64, settings);
+  const cacheHit = _quantCacheSource === sourceBase64 && _quantCache?.key === sig;
 
-  // Blur
-  current = applyBlur(current, settings.blurAmount);
+  let quantized: ImageData;
+  let generatedPalette: import('@/types').PaletteColor[];
 
-  // Resize
-  const { w, h } = getTargetDimensions(sourceCanvas, settings);
-  current = resizeImage(current, w, h, settings.sampleMode);
+  if (cacheHit && _quantCache) {
+    quantized = _quantCache.quantized;
+    generatedPalette = _quantCache.generatedPalette;
+  } else {
+    const { quantize, setLastPalette } = await import('./quantizationClient');
 
-  // Sharpen
-  current = applySharpen(current, settings.sharpenAmount);
+    // Transparency + levels + color adjustments
+    const colorData = canvasToImageData(sourceCanvas);
+    applyTransparency(colorData, settings);
+    applyLevels(colorData, settings);
+    applyColorAdjustments(colorData, settings);
+    let current = imageDataToCanvas(colorData);
 
-  // Grain (after quantization for full pipeline feel, applied pre-quantize for consistency)
-  const preQuantData = canvasToImageData(current);
-  applyGrain(preQuantData, settings.grainAmount);
-  current = imageDataToCanvas(preQuantData);
+    // Blur
+    current = applyBlur(current, settings.blurAmount);
 
-  // Quantization
-  const quantData = canvasToImageData(current);
-  const { imageData: quantized, generatedPalette } = await quantizeImage(quantData, settings);
+    // Resize
+    const { w, h } = getTargetDimensions(sourceCanvas, settings);
+    current = resizeImage(current, w, h, settings.sampleMode);
+
+    // Sharpen
+    current = applySharpen(current, settings.sharpenAmount);
+
+    // Grain (pre-quantize for consistent output)
+    const preQuantData = canvasToImageData(current);
+    applyGrain(preQuantData, settings.grainAmount);
+    current = imageDataToCanvas(preQuantData);
+
+    // Quantization — offloaded to Web Worker; buffer is transferred.
+    const quantData = canvasToImageData(current);
+    const out = await quantize(quantData, settings, { priority: 'full' });
+    quantized = out.imageData;
+    generatedPalette = out.generatedPalette;
+
+    _quantCache = { key: sig, quantized, generatedPalette };
+    _quantCacheSource = sourceBase64;
+
+    // Seed tier-2 fast preview with this palette for the next drag.
+    setLastPalette(sourceBase64, generatedPalette);
+  }
+
   let resultCanvas = imageDataToCanvas(quantized);
 
-  // CRT effect
+  // CRT effect — post-quant, not cached
   if (settings.crtEnabled) {
     try {
       resultCanvas = applyCRTFilter(resultCanvas, {
@@ -402,10 +502,76 @@ export async function processFullPipeline(
         rgbShift: settings.crtRgbShift,
         vignette: settings.crtVignette,
       });
-    } catch { /* CRT failed, skip */ }
+    } catch (err) { console.warn('CRT filter failed, skipping:', err); }
   }
 
-  // toDataURL omitted from hot path — slow PNG encode only happens on
-  // savePreset via canvasBus. UI reads the canvas directly.
   return { resultCanvas, generatedPalette };
+}
+
+// --- Tier 2: fast-quant preview ---
+// Runs the full pipeline at a smaller resolution via the worker, reusing the
+// last generated palette so the costly Wu/RGBQuant sample step is skipped.
+// Async, superseded by newer calls via latest-wins in quantizationClient.
+const FAST_QUANT_MAX_DIM = 256;
+
+export async function processFastQuantPreview(
+  sourceCanvas: HTMLCanvasElement,
+  settings: ConverterSettings,
+  sourceKey: string
+): Promise<HTMLCanvasElement | null> {
+  try {
+    const { quantize, getLastPalette } = await import('./quantizationClient');
+
+    let { w, h } = getTargetDimensions(sourceCanvas, settings);
+    const maxSide = Math.max(w, h);
+    if (maxSide > FAST_QUANT_MAX_DIM) {
+      const scale = FAST_QUANT_MAX_DIM / maxSide;
+      w = Math.max(1, Math.round(w * scale));
+      h = Math.max(1, Math.round(h * scale));
+    }
+
+    // Stages 1-4 inline (no cache: this path is async + latest-wins,
+    // the O(pixels) work at 256 is cheap enough to redo).
+    let c = resizeImage(sourceCanvas, w, h, settings.sampleMode);
+    c = applyBlur(c, settings.blurAmount);
+
+    const data = canvasToImageData(c);
+    applyTransparency(data, settings);
+    applyLevels(data, settings);
+    applyColorAdjustments(data, settings);
+    applyGrain(data, settings.grainAmount);
+    c = imageDataToCanvas(data);
+
+    c = applySharpen(c, settings.sharpenAmount);
+
+    // Only freeze palette in generated mode. Custom palette is already fast.
+    const frozenPalette = settings.palette.length === 0
+      ? getLastPalette(sourceKey) ?? undefined
+      : undefined;
+
+    const quantData = canvasToImageData(c);
+    const { imageData: quantized } = await quantize(quantData, settings, {
+      priority: 'fast',
+      frozenPalette,
+    });
+
+    let result = imageDataToCanvas(quantized);
+
+    if (settings.crtEnabled) {
+      try {
+        result = applyCRTFilter(result, {
+          scanlineIntensity: settings.crtScanlines,
+          rgbShift: settings.crtRgbShift,
+          vignette: settings.crtVignette,
+        });
+      } catch (err) { console.warn('Tier-2 CRT failed:', err); }
+    }
+
+    return result;
+  } catch (err) {
+    // Stale responses reject with 'stale' — not a real error, just drop.
+    if (err instanceof Error && err.message === 'stale') return null;
+    console.error('Fast-quant preview error:', err);
+    return null;
+  }
 }

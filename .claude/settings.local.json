@@ -27,7 +27,8 @@
       "WebFetch(domain:socket.dev)",
       "WebFetch(domain:snyk.io)",
       "Bash(find src/hooks -name \"useDebounce*\" -exec cat {} \\\\;)",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "mcp__plugin_socraticode_socraticode__codebase_index"
     ]
   }
 }

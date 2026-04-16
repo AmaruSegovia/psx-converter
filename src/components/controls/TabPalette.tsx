@@ -15,6 +15,7 @@ import { HexColorPicker } from 'react-colorful';
 import { BUILTIN_PALETTES } from '@/data/builtinPalettes';
 import { hexToColor, parsePaletteFile, exportPaletteHex, exportPaletteGPL, exportPaletteJSON } from '@/lib/paletteParser';
 import type { PaletteColor } from '@/types';
+import type { TranslationKey } from '@/lib/i18n';
 
 import { InfoTip } from '@/components/ui/info-tip';
 
@@ -25,7 +26,7 @@ export function TabPalette() {
   const settings = useConverterStore((s) => s.settings);
   const updateSettings = useConverterStore((s) => s.updateSettings);
   const generatedPalette = useConverterStore((s) => s.generatedPalette);
-  const { fetchPalette, loading: lospecLoading, error: lospecError } = useLospecAPI();
+  const { fetchPalette, loading: lospecLoading, errorCode: lospecErrorCode } = useLospecAPI();
   const [lospecSlug, setLospecSlug] = useState(settings.lospecSlug);
   const [selectedColorIdx, setSelectedColorIdx] = useState<number | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -425,7 +426,7 @@ export function TabPalette() {
             {lospecLoading ? '...' : t('palette.import')}
           </Button>
         </div>
-        {lospecError && <p className="text-[11px] text-destructive">{lospecError}</p>}
+        {lospecErrorCode && <p className="text-[11px] text-destructive">{t(`lospec.error.${lospecErrorCode}` as TranslationKey)}</p>}
       </div>
 
       {/* Builtin palettes */}

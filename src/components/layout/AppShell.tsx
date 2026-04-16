@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import JSZip from 'jszip';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useConverterStore } from '@/store/converterStore';
@@ -7,6 +6,7 @@ import { useImageProcessor } from '@/hooks/useImageProcessor';
 import { useTranslation } from '@/hooks/useTranslation';
 import { exportPNG, loadImage, processFullPipeline } from '@/lib/imageProcessing';
 import { getResultCanvas, subscribeCanvas, getResultDimensions } from '@/lib/canvasBus';
+import { onWorkerCrash } from '@/lib/quantizationClient';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,6 +29,8 @@ export function AppShell() {
   const [batchSizes, setBatchSizes] = useState([32, 64, 128, 256]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [batchExporting, setBatchExporting] = useState(false);
+  const [pendingReplaceFile, setPendingReplaceFile] = useState<File | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // --- Smart filename ---
   const getExportFilename = useCallback((w?: number, h?: number) => {
@@ -75,7 +77,9 @@ export function AppShell() {
     if (!source) return;
 
     setBatchExporting(true);
+    const failedSizes: number[] = [];
     try {
+      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       for (const size of batchSizes) {
         try {
@@ -85,7 +89,14 @@ export function AppShell() {
             resultCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
           );
           zip.file(getExportFilename(size, size), blob);
-        } catch { /* skip failed size */ }
+        } catch (err) {
+          console.error(`Batch export failed for size ${size}:`, err);
+          failedSizes.push(size);
+        }
+      }
+      if (failedSizes.length === batchSizes.length) {
+        toast.error(t('toast.zipFailed'));
+        return;
       }
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       const storeName = useConverterStore.getState().sourceFileName || 'psx-texture';
@@ -95,11 +106,46 @@ export function AppShell() {
       a.download = `${storeName}_batch.zip`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(t('toast.zipExported'));
-    } catch { /* zip failed */ }
-    setBatchExporting(false);
-    setShowBatchExport(false);
+      if (failedSizes.length > 0) {
+        toast.warning(`${t('toast.zipExported')} — ${t('toast.zipSkipped')}: ${failedSizes.join(', ')}`);
+      } else {
+        toast.success(t('toast.zipExported'));
+      }
+    } catch (err) {
+      console.error('Batch export failed:', err);
+      toast.error(t('toast.zipFailed'));
+    } finally {
+      setBatchExporting(false);
+      setShowBatchExport(false);
+    }
   }, [batchSizes, getExportFilename, t]);
+
+  const loadDroppedFile = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const base64 = ev.target?.result as string;
+        const store = useConverterStore.getState();
+        store.setSourceImage(base64, file.name);
+        const img = await loadImage(base64);
+        store.setOriginalDimensions(img.naturalWidth, img.naturalHeight);
+        const s = store.settings;
+        if (s.sizeMode === 'absolute') {
+          store.updateSettings({
+            width: Math.min(img.naturalWidth, s.width),
+            height: Math.min(img.naturalHeight, s.height),
+          });
+        } else {
+          store.updateSettings({ width: 100, height: 100 });
+        }
+        toast.success(`${t('toast.imageLoaded')} (${img.naturalWidth} x ${img.naturalHeight}px)`);
+      } catch {
+        toast.error(t('dropzone.loadError'));
+      }
+    };
+    reader.onerror = () => toast.error(t('dropzone.loadError'));
+    reader.readAsDataURL(file);
+  }, [t]);
 
   // --- Drop on preview (replace image) ---
   const handleDropOnPreview = useCallback((e: React.DragEvent) => {
@@ -107,27 +153,13 @@ export function AppShell() {
     setIsDragOver(false);
     const file = e.dataTransfer.files[0];
     if (!file || !file.type.startsWith('image/')) return;
+    setPendingReplaceFile(file);
+  }, []);
 
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const base64 = ev.target?.result as string;
-      const store = useConverterStore.getState();
-      store.setSourceImage(base64, file.name);
-      const img = await loadImage(base64);
-      store.setOriginalDimensions(img.naturalWidth, img.naturalHeight);
-      const s = store.settings;
-      if (s.sizeMode === 'absolute') {
-        store.updateSettings({
-          width: Math.min(img.naturalWidth, s.width),
-          height: Math.min(img.naturalHeight, s.height),
-        });
-      } else {
-        store.updateSettings({ width: 100, height: 100 });
-      }
-      toast.success(`${t('toast.imageLoaded')} (${img.naturalWidth} x ${img.naturalHeight}px)`);
-    };
-    reader.readAsDataURL(file);
-  }, [t]);
+  const handleConfirmReplace = useCallback(() => {
+    if (pendingReplaceFile) loadDroppedFile(pendingReplaceFile);
+    setPendingReplaceFile(null);
+  }, [pendingReplaceFile, loadDroppedFile]);
 
   // --- Effects ---
   useEffect(() => {
@@ -136,6 +168,15 @@ export function AppShell() {
       setHasResult(w > 0);
     });
   }, []);
+
+  useEffect(() => {
+    let notified = false;
+    return onWorkerCrash(() => {
+      if (notified) return;
+      notified = true;
+      toast.warning(t('toast.workerCrashed'));
+    });
+  }, [t]);
 
   useEffect(() => {
     if (!sourceImage) setHasResult(false);
@@ -184,6 +225,16 @@ export function AppShell() {
       {/* Header */}
       <header className="flex items-center justify-between px-4 h-11 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMobileSidebarOpen((v) => !v)}
+            className="md:hidden w-6 h-6 rounded hover:bg-muted/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            title={t('sidebar.toggle')}
+            aria-label={t('sidebar.toggle')}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M3 6h18M3 12h18M3 18h18" />
+            </svg>
+          </button>
           <div className="w-5 h-5 rounded bg-primary/20 flex items-center justify-center">
             <span className="text-[10px] font-bold text-primary">PS</span>
           </div>
@@ -252,6 +303,20 @@ export function AppShell() {
       </header>
 
       {/* Dialogs */}
+      <Dialog open={!!pendingReplaceFile} onOpenChange={(o) => { if (!o) setPendingReplaceFile(null); }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader><DialogTitle>{t('replace.title')}</DialogTitle></DialogHeader>
+          <p className="text-[12px] text-muted-foreground">{t('replace.description')}</p>
+          {pendingReplaceFile && (
+            <p className="text-[11px] text-muted-foreground/70 truncate font-mono">{pendingReplaceFile.name}</p>
+          )}
+          <div className="flex gap-2 justify-end">
+            <Button size="sm" variant="outline" className="text-[11px]" onClick={() => setPendingReplaceFile(null)}>{t('replace.cancel')}</Button>
+            <Button size="sm" className="text-[11px] bg-primary hover:bg-primary/90" onClick={handleConfirmReplace}>{t('replace.confirm')}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
         <DialogContent className="max-w-xs">
           <DialogHeader><DialogTitle>{t('remove.title')}</DialogTitle></DialogHeader>
@@ -304,8 +369,8 @@ export function AppShell() {
       </Dialog>
 
       {/* Main area */}
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
+      <div className="flex flex-1 overflow-hidden relative">
+        <Sidebar isMobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />
 
         <main className="flex-1 flex flex-col overflow-hidden"
           onDragOver={(e) => { if (sourceImage) { e.preventDefault(); setIsDragOver(true); } }}

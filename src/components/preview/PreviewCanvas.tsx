@@ -23,6 +23,9 @@ export function PreviewCanvas() {
   const dragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
   const prevDims = useRef({ w: 0, h: 0 });
+  // Pointer tracking for pinch-zoom on touch devices
+  const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const lastPinchDist = useRef(0);
   // Refs so callbacks can read latest values without re-subscribing
   const showTileRef = useRef(false);
   showTileRef.current = showTile;
@@ -188,14 +191,44 @@ export function PreviewCanvas() {
     return () => el.removeEventListener('wheel', handler);
   }, [displayW, displayH]);
 
-  // Drag pan
+  // Drag pan + pinch zoom
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    dragging.current = true;
-    lastMouse.current = { x: e.clientX, y: e.clientY };
+    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
+
+    if (activePointers.current.size === 1) {
+      dragging.current = true;
+      lastMouse.current = { x: e.clientX, y: e.clientY };
+    } else if (activePointers.current.size === 2) {
+      dragging.current = false;
+      const [a, b] = Array.from(activePointers.current.values());
+      lastPinchDist.current = Math.hypot(b.x - a.x, b.y - a.y);
+    }
   }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!activePointers.current.has(e.pointerId)) return;
+    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (activePointers.current.size === 2) {
+      const [a, b] = Array.from(activePointers.current.values());
+      const dist = Math.hypot(b.x - a.x, b.y - a.y);
+      if (lastPinchDist.current > 0) {
+        const factor = dist / lastPinchDist.current;
+        setZoom(prev => {
+          const next = Math.max(1, Math.min(40, prev * factor));
+          const ratio = next / prev;
+          setPan(p => {
+            const { cw, ch } = getContainerSize();
+            return clampPan(p.x * ratio, p.y * ratio, next, displayW, displayH, cw, ch);
+          });
+          return next;
+        });
+      }
+      lastPinchDist.current = dist;
+      return;
+    }
+
     if (!dragging.current) return;
     const dx = e.clientX - lastMouse.current.x;
     const dy = e.clientY - lastMouse.current.y;
@@ -206,8 +239,15 @@ export function PreviewCanvas() {
     });
   }, [zoom, displayW, displayH, getContainerSize]);
 
-  const handlePointerUp = useCallback(() => {
-    dragging.current = false;
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    activePointers.current.delete(e.pointerId);
+    if (activePointers.current.size < 2) lastPinchDist.current = 0;
+    if (activePointers.current.size === 0) dragging.current = false;
+    else if (activePointers.current.size === 1) {
+      const remaining = Array.from(activePointers.current.values())[0];
+      lastMouse.current = { x: remaining.x, y: remaining.y };
+      dragging.current = true;
+    }
   }, []);
 
   const handleDoubleClick = useCallback(() => {
@@ -297,9 +337,11 @@ export function PreviewCanvas() {
           <div
             ref={containerRef}
             className={`overflow-hidden flex-1 w-full relative ${canPan ? 'cursor-grab active:cursor-grabbing' : ''}`}
+            style={{ touchAction: 'none' }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
             onDoubleClick={handleDoubleClick}
           >
             <canvas

@@ -3,36 +3,63 @@ import type { PaletteColor, LospecPaletteResponse } from '@/types';
 
 const LOSPEC_API = 'https://lospec.com/palette-list';
 
+export type LospecErrorCode =
+  | 'empty'
+  | 'notFound'
+  | 'server'
+  | 'network'
+  | 'format'
+  | 'unknown';
+
 export function useLospecAPI() {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<LospecErrorCode | null>(null);
 
   const fetchPalette = useCallback(async (input: string): Promise<PaletteColor[] | null> => {
     if (!input.trim()) {
-      setError('Enter a palette name or Lospec URL');
+      setErrorCode('empty');
       return null;
     }
 
-    // Extract slug from full URL or use as-is
     let slug = input.trim();
     const urlMatch = slug.match(/lospec\.com\/palette-list\/([a-z0-9-]+)/i);
-    if (urlMatch) {
-      slug = urlMatch[1];
-    }
-    // Also strip leading/trailing slashes
+    if (urlMatch) slug = urlMatch[1];
     slug = slug.replace(/^\/+|\/+$/g, '');
 
     setLoading(true);
-    setError(null);
+    setErrorCode(null);
 
     try {
-      const response = await fetch(`${LOSPEC_API}/${slug}.json`);
-
-      if (!response.ok) {
-        throw new Error('Palette not found');
+      let response: Response;
+      try {
+        response = await fetch(`${LOSPEC_API}/${slug}.json`);
+      } catch {
+        // fetch only rejects on network errors / CORS / offline
+        setErrorCode('network');
+        return null;
       }
 
-      const data: LospecPaletteResponse = await response.json();
+      if (response.status === 404) {
+        setErrorCode('notFound');
+        return null;
+      }
+      if (!response.ok) {
+        setErrorCode('server');
+        return null;
+      }
+
+      let data: LospecPaletteResponse;
+      try {
+        data = await response.json();
+      } catch {
+        setErrorCode('format');
+        return null;
+      }
+
+      if (!data || !Array.isArray(data.colors) || data.colors.length === 0) {
+        setErrorCode('format');
+        return null;
+      }
 
       return data.colors.map((hex) => ({
         hex: `#${hex}`,
@@ -40,13 +67,13 @@ export function useLospecAPI() {
         g: parseInt(hex.slice(2, 4), 16),
         b: parseInt(hex.slice(4, 6), 16),
       }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to fetch palette');
+    } catch {
+      setErrorCode('unknown');
       return null;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  return { fetchPalette, loading, error };
+  return { fetchPalette, loading, errorCode };
 }

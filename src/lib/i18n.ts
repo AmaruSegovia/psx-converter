@@ -12,6 +12,23 @@ const translations = {
     'remove.cancel': 'Cancel',
     'remove.confirm': 'Remove',
 
+    // Reset dialog
+    'reset.title': 'Reset all settings?',
+    'reset.description': 'Every slider returns to default. You can undo afterwards.',
+    'reset.cancel': 'Cancel',
+    'reset.confirm': 'Reset',
+
+    // Replace image dialog
+    'replace.title': 'Replace image?',
+    'replace.description': 'Undo history will be cleared. Your settings are kept.',
+    'replace.cancel': 'Cancel',
+    'replace.confirm': 'Replace',
+
+    // Dropzone loading
+    'dropzone.loading': 'Loading image...',
+    'dropzone.loadError': 'Could not read the file',
+    'dropzone.exampleError': 'Could not load example',
+
     // Bottom bar
     'view.compare': 'Compare',
     'view.sideBySide': 'Side by Side',
@@ -144,12 +161,25 @@ const translations = {
     // History
     'sidebar.history': 'History',
     'sidebar.clearHistory': 'Clear history',
+    'sidebar.toggle': 'Toggle sidebar',
+
+    // Lospec errors
+    'lospec.error.empty': 'Enter a palette name or Lospec URL',
+    'lospec.error.notFound': 'Palette not found on Lospec',
+    'lospec.error.server': 'Lospec server error, try again later',
+    'lospec.error.network': 'Network error — check your connection',
+    'lospec.error.format': 'Invalid palette data from Lospec',
+    'lospec.error.unknown': 'Could not load palette',
 
     // Batch export
     'export.batch': 'Batch Export',
     'export.batchTitle': 'Export Multiple Sizes',
     'export.download': 'Download All',
     'toast.zipExported': 'ZIP exported',
+    'toast.zipFailed': 'ZIP export failed',
+    'toast.zipSkipped': 'skipped sizes',
+    'toast.workerCrashed': 'Background worker failed — falling back to main thread (may be slower)',
+    'toast.storageFull': 'Browser storage full — some settings may not persist. Delete old presets to free space.',
 
     // Posterize
     'colors.posterize': 'Posterize',
@@ -206,6 +236,23 @@ const translations = {
     'remove.description': 'Se perderán todos los cambios actuales. Esta acción no se puede deshacer.',
     'remove.cancel': 'Cancelar',
     'remove.confirm': 'Eliminar',
+
+    // Reset dialog
+    'reset.title': '¿Restablecer todos los ajustes?',
+    'reset.description': 'Todos los sliders vuelven al valor por defecto. Podés deshacerlo después.',
+    'reset.cancel': 'Cancelar',
+    'reset.confirm': 'Restablecer',
+
+    // Replace image dialog
+    'replace.title': '¿Reemplazar imagen?',
+    'replace.description': 'Se limpiará el historial de deshacer. Tus ajustes se mantienen.',
+    'replace.cancel': 'Cancelar',
+    'replace.confirm': 'Reemplazar',
+
+    // Dropzone loading
+    'dropzone.loading': 'Cargando imagen...',
+    'dropzone.loadError': 'No se pudo leer el archivo',
+    'dropzone.exampleError': 'No se pudo cargar el ejemplo',
 
     'view.compare': 'Comparar',
     'view.sideBySide': 'Lado a Lado',
@@ -324,11 +371,23 @@ const translations = {
 
     'sidebar.history': 'Historial',
     'sidebar.clearHistory': 'Limpiar historial',
+    'sidebar.toggle': 'Alternar panel',
+
+    'lospec.error.empty': 'Ingresa un nombre o URL de Lospec',
+    'lospec.error.notFound': 'Paleta no encontrada en Lospec',
+    'lospec.error.server': 'Error del servidor de Lospec, reintenta luego',
+    'lospec.error.network': 'Error de red — revisa tu conexión',
+    'lospec.error.format': 'Datos de paleta inválidos desde Lospec',
+    'lospec.error.unknown': 'No se pudo cargar la paleta',
 
     'export.batch': 'Exportar en lote',
     'export.batchTitle': 'Exportar Múltiples Tamaños',
     'export.download': 'Descargar Todo',
     'toast.zipExported': 'ZIP exportado',
+    'toast.zipFailed': 'Falló la exportación del ZIP',
+    'toast.zipSkipped': 'tamaños omitidos',
+    'toast.workerCrashed': 'Worker en segundo plano falló — usando hilo principal (puede ser más lento)',
+    'toast.storageFull': 'Almacenamiento del navegador lleno — algunos ajustes no se guardarán. Elimina presets viejos para liberar espacio.',
 
     'colors.posterize': 'Posterizar',
     'colors.posterizeTip': 'Reduce la cantidad de tonos por canal. 0 = desactivado. Valores menores crean un look más gráfico y retro.',

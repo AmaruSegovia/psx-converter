@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useConverterStore } from '@/store/converterStore';
 import { useDebounce } from './useDebounce';
-import { processFastPreview, processFullPipeline, getCachedPreview } from '@/lib/imageProcessing';
+import {
+  processFastPreview,
+  processFastQuantPreview,
+  processFullPipeline,
+  getCachedPreview,
+} from '@/lib/imageProcessing';
 import { publishCanvas } from '@/lib/canvasBus';
 import { toast } from 'sonner';
 
@@ -28,32 +33,41 @@ export function useImageProcessor() {
     getCachedPreview(sourceImage).then(setSourceCanvas);
   }, [sourceImage, setResult]);
 
-  // Instant preview — fires on every settings or source change
+  // 3-tier preview:
+  //   Tier 1 — rAF, sync, pre-quant (flash so canvas isn't empty)
+  //   Tier 2 — async worker, quantized at 256 with frozen palette (fidelity)
+  //   Tier 3 — debounced 400 ms, full pipeline at real target (see effect below)
   useEffect(() => {
-    if (!sourceCanvas) return;
+    if (!sourceCanvas || !sourceImage) return;
 
     const gen = ++previewGenRef.current;
     cancelAnimationFrame(rafRef.current);
 
     rafRef.current = requestAnimationFrame(() => {
       if (previewGenRef.current !== gen) return;
-
       try {
-        const result = processFastPreview(sourceCanvas, settings);
-        if (previewGenRef.current === gen && result.width > 0 && result.height > 0) {
-          publishCanvas(result);
+        const tier1 = processFastPreview(sourceCanvas, settings);
+        if (previewGenRef.current === gen && tier1.width > 0 && tier1.height > 0) {
+          publishCanvas(tier1);
         }
       } catch (err) {
         console.error('Fast preview error:', err);
       }
     });
 
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [settings, sourceCanvas]);
+    // Tier 2 — fires in parallel, replaces tier 1 when it lands (~50-120ms).
+    // Superseded by newer drags via latest-wins in quantizationClient.
+    processFastQuantPreview(sourceCanvas, settings, sourceImage).then((canvas) => {
+      if (!canvas) return;
+      if (previewGenRef.current !== gen) return;
+      publishCanvas(canvas);
+    });
 
-  // Full quality — debounced, with quantization.
-  // Separate gen from fast preview so a slider drag mid-pipeline doesn't
-  // strand isProcessing at true.
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [settings, sourceCanvas, sourceImage]);
+
+  // Tier 3 — full quality, debounced. Separate gen so a drag mid-pipeline
+  // doesn't strand isProcessing at true.
   useEffect(() => {
     if (!sourceImage) return;
 
@@ -71,8 +85,6 @@ export function useImageProcessor() {
         console.error('Processing error:', err);
         if (fullGenRef.current === gen) toast.error('Processing failed');
       } finally {
-        // Only clear if no newer pipeline has started; otherwise the newer
-        // one will clear it when it finishes.
         if (fullGenRef.current === gen) {
           setIsProcessing(false);
         }
