@@ -2,7 +2,6 @@ import { useConverterStore } from '@/store/converterStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { InfoTip } from '@/components/ui/info-tip';
 import { DEFAULT_SETTINGS } from '@/types';
 
 interface SliderControlProps {
