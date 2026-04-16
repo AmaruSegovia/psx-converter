@@ -14,7 +14,8 @@ export function useImageProcessor() {
 
   const fullSettings = useDebounce(settings, 400);
   const rafRef = useRef(0);
-  const genRef = useRef(0);
+  const previewGenRef = useRef(0);
+  const fullGenRef = useRef(0);
   const [sourceCanvas, setSourceCanvas] = useState<HTMLCanvasElement | null>(null);
 
   // Pre-cache source when it changes
@@ -31,15 +32,15 @@ export function useImageProcessor() {
   useEffect(() => {
     if (!sourceCanvas) return;
 
-    const gen = ++genRef.current;
+    const gen = ++previewGenRef.current;
     cancelAnimationFrame(rafRef.current);
 
     rafRef.current = requestAnimationFrame(() => {
-      if (genRef.current !== gen) return;
+      if (previewGenRef.current !== gen) return;
 
       try {
         const result = processFastPreview(sourceCanvas, settings);
-        if (genRef.current === gen && result && result.width > 0 && result.height > 0) {
+        if (previewGenRef.current === gen && result.width > 0 && result.height > 0) {
           publishCanvas(result);
         }
       } catch (err) {
@@ -50,30 +51,32 @@ export function useImageProcessor() {
     return () => cancelAnimationFrame(rafRef.current);
   }, [settings, sourceCanvas]);
 
-  // Full quality — debounced, with quantization
+  // Full quality — debounced, with quantization.
+  // Separate gen from fast preview so a slider drag mid-pipeline doesn't
+  // strand isProcessing at true.
   useEffect(() => {
     if (!sourceImage) return;
 
-    // Capture gen AFTER fast preview has set its value
-    const gen = genRef.current;
+    const gen = ++fullGenRef.current;
     setIsProcessing(true);
 
-    processFullPipeline(sourceImage, fullSettings)
-      .then(({ resultBase64, resultCanvas, generatedPalette }) => {
-        // Apply if no newer settings change happened
-        if (genRef.current === gen) {
-          publishCanvas(resultCanvas);
-          setResult(resultBase64, resultCanvas.width, resultCanvas.height);
-          setGeneratedPalette(generatedPalette);
-          setIsProcessing(false);
-        }
-      })
-      .catch((err) => {
+    (async () => {
+      try {
+        const { resultCanvas, generatedPalette } = await processFullPipeline(sourceImage, fullSettings);
+        if (fullGenRef.current !== gen) return;
+        publishCanvas(resultCanvas);
+        setResult(null, resultCanvas.width, resultCanvas.height);
+        setGeneratedPalette(generatedPalette);
+      } catch (err) {
         console.error('Processing error:', err);
-        if (genRef.current === gen) {
+        if (fullGenRef.current === gen) toast.error('Processing failed');
+      } finally {
+        // Only clear if no newer pipeline has started; otherwise the newer
+        // one will clear it when it finishes.
+        if (fullGenRef.current === gen) {
           setIsProcessing(false);
-          toast.error('Processing failed');
         }
-      });
-  }, [fullSettings, sourceImage, setResult, setIsProcessing]);
+      }
+    })();
+  }, [fullSettings, sourceImage, setResult, setIsProcessing, setGeneratedPalette]);
 }

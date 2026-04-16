@@ -311,13 +311,23 @@ function getTargetDimensions(
   return { w: Math.max(1, w), h: Math.max(1, h) };
 }
 
+// Fast preview target dim cap — keeps per-frame work bounded while dragging
+// the size slider. Full pipeline still runs at user's real target after debounce.
+const FAST_PREVIEW_MAX_DIM = 512;
+
 /** Fast preview: resize FIRST, then color adjustments on small canvas. No quantization, no base64. */
 export function processFastPreview(
   sourceCanvas: HTMLCanvasElement,
   settings: ConverterSettings
 ): HTMLCanvasElement {
   // 1. Resize first (512→128 = 16K pixels instead of 262K)
-  const { w, h } = getTargetDimensions(sourceCanvas, settings);
+  let { w, h } = getTargetDimensions(sourceCanvas, settings);
+  const maxSide = Math.max(w, h);
+  if (maxSide > FAST_PREVIEW_MAX_DIM) {
+    const scale = FAST_PREVIEW_MAX_DIM / maxSide;
+    w = Math.max(1, Math.round(w * scale));
+    h = Math.max(1, Math.round(h * scale));
+  }
   let current = resizeImage(sourceCanvas, w, h, settings.sampleMode);
 
   // 2. Blur on small canvas
@@ -352,7 +362,7 @@ export function processFastPreview(
 export async function processFullPipeline(
   sourceBase64: string,
   settings: ConverterSettings
-): Promise<{ resultBase64: string; resultCanvas: HTMLCanvasElement; generatedPalette: import('@/types').PaletteColor[] }> {
+): Promise<{ resultCanvas: HTMLCanvasElement; generatedPalette: import('@/types').PaletteColor[] }> {
   const { default: quantizeImage } = await import('./quantization');
 
   const sourceCanvas = await getCachedSource(sourceBase64);
@@ -395,6 +405,7 @@ export async function processFullPipeline(
     } catch { /* CRT failed, skip */ }
   }
 
-  const resultBase64 = resultCanvas.toDataURL('image/png');
-  return { resultBase64, resultCanvas, generatedPalette };
+  // toDataURL omitted from hot path — slow PNG encode only happens on
+  // savePreset via canvasBus. UI reads the canvas directly.
+  return { resultCanvas, generatedPalette };
 }

@@ -25,7 +25,9 @@
       "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const j=JSON.parse\\(d\\); console.log\\('version:',j.version,'|','time latest:',j.time?.latest,'|','unpacked size:',j.dist?.unpackedSize,'|','dist size:',j.dist?.fileCount\\)\")",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:socket.dev)",
-      "WebFetch(domain:snyk.io)"
+      "WebFetch(domain:snyk.io)",
+      "Bash(find src/hooks -name \"useDebounce*\" -exec cat {} \\\\;)",
+      "Bash(echo \"EXIT=$?\")"
     ]
   }
 }

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import type { ConverterSettings, Preset, PaletteColor } from '@/types';
 import { DEFAULT_SETTINGS } from '@/types';
+import { getResultCanvas } from '@/lib/canvasBus';
 
 // Throttled localStorage wrapper
 let _persistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -92,11 +93,15 @@ export const useConverterStore = create<ConverterStore>()(
 
       savePreset: (name) => {
         const state = get();
+        // Encode thumbnail lazily from current canvas — toDataURL is slow and
+        // only needed on save, not on every pipeline run.
+        const canvas = getResultCanvas();
+        const thumbnail = canvas ? canvas.toDataURL('image/png') : undefined;
         const preset: Preset = {
           id: uuidv4(),
           name,
           settings: { ...state.settings },
-          thumbnail: state.resultImage ?? undefined,
+          thumbnail,
           createdAt: Date.now(),
         };
         set((s) => ({ presets: [...s.presets, preset] }));

@@ -120,10 +120,11 @@ export function PresetLoadDialog() {
           sizeMode: 'absolute',
         };
         try {
-          const { resultBase64 } = await processFullPipeline(sourceImage, thumbSettings);
+          const { resultCanvas } = await processFullPipeline(sourceImage, thumbSettings);
           if (cancelled) break;
-          map.set(preset.id, resultBase64);
-          setPreviews((prev) => ({ ...prev, [preset.id]: resultBase64 }));
+          const base64 = resultCanvas.toDataURL('image/png');
+          map.set(preset.id, base64);
+          setPreviews((prev) => ({ ...prev, [preset.id]: base64 }));
         } catch {
           /* skip failed preset */
         }
