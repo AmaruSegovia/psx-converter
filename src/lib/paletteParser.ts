@@ -69,3 +69,39 @@ export function parsePaletteFile(filename: string, content: string): PaletteColo
     default: return parseHexFile(content);
   }
 }
+
+// --- Palette export ---
+
+function downloadText(content: string, filename: string, mime = 'text/plain') {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function exportPaletteHex(colors: PaletteColor[], filename = 'palette.hex') {
+  const content = colors.map(c => c.hex.slice(1).toLowerCase()).join('\n');
+  downloadText(content, filename);
+}
+
+export function exportPaletteGPL(colors: PaletteColor[], name = 'PSX', filename = 'palette.gpl') {
+  const header = `GIMP Palette\nName: ${name}\nColumns: 8\n#\n`;
+  const body = colors
+    .map((c, i) =>
+      `${String(c.r).padStart(3)} ${String(c.g).padStart(3)} ${String(c.b).padStart(3)} color${i + 1}`
+    )
+    .join('\n');
+  downloadText(header + body, filename);
+}
+
+export function exportPaletteJSON(colors: PaletteColor[], filename = 'palette.json') {
+  const content = JSON.stringify(
+    colors.map(c => ({ r: c.r, g: c.g, b: c.b, hex: c.hex })),
+    null,
+    2
+  );
+  downloadText(content, filename, 'application/json');
+}

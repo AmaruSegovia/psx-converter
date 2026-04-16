@@ -10,6 +10,7 @@ export function useImageProcessor() {
   const sourceImage = useConverterStore((s) => s.sourceImage);
   const setResult = useConverterStore((s) => s.setResult);
   const setIsProcessing = useConverterStore((s) => s.setIsProcessing);
+  const setGeneratedPalette = useConverterStore((s) => s.setGeneratedPalette);
 
   const fullSettings = useDebounce(settings, 400);
   const rafRef = useRef(0);
@@ -58,11 +59,12 @@ export function useImageProcessor() {
     setIsProcessing(true);
 
     processFullPipeline(sourceImage, fullSettings)
-      .then(({ resultBase64, resultCanvas }) => {
+      .then(({ resultBase64, resultCanvas, generatedPalette }) => {
         // Apply if no newer settings change happened
         if (genRef.current === gen) {
           publishCanvas(resultCanvas);
           setResult(resultBase64, resultCanvas.width, resultCanvas.height);
+          setGeneratedPalette(generatedPalette);
           setIsProcessing(false);
         }
       })

@@ -10,9 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { HexColorPicker } from 'react-colorful';
 import { BUILTIN_PALETTES } from '@/data/builtinPalettes';
-import { hexToColor, parsePaletteFile } from '@/lib/paletteParser';
+import { hexToColor, parsePaletteFile, exportPaletteHex, exportPaletteGPL, exportPaletteJSON } from '@/lib/paletteParser';
 import type { PaletteColor } from '@/types';
 
 import { InfoTip } from '@/components/ui/info-tip';
@@ -23,13 +24,28 @@ export function TabPalette() {
   const { t } = useTranslation();
   const settings = useConverterStore((s) => s.settings);
   const updateSettings = useConverterStore((s) => s.updateSettings);
+  const generatedPalette = useConverterStore((s) => s.generatedPalette);
   const { fetchPalette, loading: lospecLoading, error: lospecError } = useLospecAPI();
   const [lospecSlug, setLospecSlug] = useState(settings.lospecSlug);
   const [selectedColorIdx, setSelectedColorIdx] = useState<number | null>(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
-  const selectedColor = selectedColorIdx !== null ? settings.palette[selectedColorIdx] : null;
+  const isGenerated = settings.paletteSource === 'generated';
   const hasCustomPalette = settings.palette.length > 0;
+  // What to display in swatches: generated colors (read from store) or custom palette
+  const displayPalette = isGenerated ? generatedPalette : settings.palette;
+  const hasDisplayPalette = displayPalette.length > 0;
+  const selectedColor = selectedColorIdx !== null ? (displayPalette[selectedColorIdx] ?? null) : null;
   const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Promote auto-generated palette to editable custom palette
+  const promoteToCustom = useCallback((base: PaletteColor[]) => {
+    updateSettings({
+      palette: base.map(c => ({ ...c })),
+      paletteSource: 'custom',
+      colorCount: base.length,
+    });
+  }, [updateSettings]);
 
   // Click outside picker to close
   useEffect(() => {
@@ -80,10 +96,17 @@ export function TabPalette() {
   }, [updateSettings]);
 
   const handleHexChange = useCallback((hex: string) => {
-    if (selectedColorIdx === null) return;
+    if (selectedColorIdx === null || settings.palette.length === 0) return;
     const newPalette = [...settings.palette];
     newPalette[selectedColorIdx] = hexToColor(hex);
     updateSettings({ palette: newPalette });
+  }, [selectedColorIdx, settings.palette, updateSettings]);
+
+  const handleDeleteColor = useCallback(() => {
+    if (selectedColorIdx === null || settings.palette.length === 0) return;
+    const newPalette = settings.palette.filter((_, i) => i !== selectedColorIdx);
+    updateSettings({ palette: newPalette, colorCount: newPalette.length });
+    setSelectedColorIdx(null);
   }, [selectedColorIdx, settings.palette, updateSettings]);
 
   const hasEyeDropper = typeof window !== 'undefined' && 'EyeDropper' in window;
@@ -95,26 +118,27 @@ export function TabPalette() {
       const dropper = new window.EyeDropper();
       const result = await dropper.open();
       const color = hexToColor(result.sRGBHex);
+      const base = isGenerated ? generatedPalette : settings.palette;
 
-      if (selectedColorIdx !== null) {
+      if (selectedColorIdx !== null && settings.palette.length > 0) {
         // Replace selected color
         const newPalette = [...settings.palette];
         newPalette[selectedColorIdx] = color;
         updateSettings({ palette: newPalette });
         toast.success(`Color picked: ${color.hex}`);
       } else {
-        // Add to palette
+        // Add to palette (promotes from generated if needed)
         updateSettings({
-          palette: [...settings.palette, color],
+          palette: [...base.map(c => ({ ...c })), color],
           paletteSource: 'custom',
-          colorCount: settings.palette.length + 1,
+          colorCount: base.length + 1,
         });
         toast.success(`Added ${color.hex} to palette`);
       }
     } catch {
       // User cancelled
     }
-  }, [hasEyeDropper, selectedColorIdx, settings.palette, updateSettings]);
+  }, [hasEyeDropper, selectedColorIdx, isGenerated, generatedPalette, settings.palette, updateSettings]);
 
   const handleFileImport = useCallback(() => {
     const input = document.createElement('input');
@@ -145,21 +169,25 @@ export function TabPalette() {
 
   return (
     <div className="space-y-5">
-      {/* Palette swatches */}
-      {hasCustomPalette && (
+      {/* Palette swatches — shown for both custom and auto-generated palettes */}
+      {hasDisplayPalette && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-[11px]">{t('palette.colors')} ({settings.palette.length})</Label>
-            <button
-              className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
-              onClick={handleClearPalette}
-            >
-              {t('palette.clear')}
-            </button>
+            <Label className="text-[11px]">
+              {isGenerated ? t('palette.generatedColors') : t('palette.colors')} ({displayPalette.length})
+            </Label>
+            {hasCustomPalette && (
+              <button
+                className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+                onClick={handleClearPalette}
+              >
+                {t('palette.clear')}
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap gap-1">
             <AnimatePresence mode="popLayout">
-              {settings.palette.map((c: PaletteColor, i: number) => (
+              {displayPalette.map((c: PaletteColor, i: number) => (
                 <motion.button
                   key={i}
                   layout
@@ -169,7 +197,10 @@ export function TabPalette() {
                   transition={{ duration: 0.15 }}
                   className={`w-6 h-6 rounded border-2 ${selectedColorIdx === i ? 'border-white' : 'border-transparent'}`}
                   style={{ backgroundColor: c.hex }}
-                  onClick={() => setSelectedColorIdx(selectedColorIdx === i ? null : i)}
+                  onClick={() => {
+                    if (isGenerated) promoteToCustom(generatedPalette);
+                    setSelectedColorIdx(selectedColorIdx === i ? null : i);
+                  }}
                   title={c.hex}
                 />
               ))}
@@ -179,13 +210,15 @@ export function TabPalette() {
                 key="add-color"
                 className="w-6 h-6 rounded border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/40 hover:border-primary/50 hover:text-primary transition-colors"
                 onClick={() => {
+                  const base = isGenerated ? generatedPalette : settings.palette;
                   const newColor = hexToColor('#808080');
+                  const newPalette = [...base.map(c => ({ ...c })), newColor];
                   updateSettings({
-                    palette: [...settings.palette, newColor],
+                    palette: newPalette,
                     paletteSource: 'custom',
-                    colorCount: settings.palette.length + 1,
+                    colorCount: newPalette.length,
                   });
-                  setSelectedColorIdx(settings.palette.length);
+                  setSelectedColorIdx(base.length);
                 }}
                 title={t('palette.addColor')}
               >
@@ -196,6 +229,53 @@ export function TabPalette() {
             </AnimatePresence>
           </div>
         </div>
+      )}
+
+      {/* Palette export */}
+      {hasDisplayPalette && (
+        <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+          <DialogTrigger render={<Button size="sm" variant="outline" className="text-[11px] w-full" />}>
+            {t('palette.exportTitle')}
+          </DialogTrigger>
+          <DialogContent className="max-w-xs">
+            <DialogHeader>
+              <DialogTitle>{t('palette.exportTitle')}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">{t('palette.exportFormat')}</p>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  exportPaletteHex(displayPalette);
+                  toast.success(t('toast.paletteExported'));
+                  setExportDialogOpen(false);
+                }}
+              >
+                Hex <span className="text-muted-foreground font-mono text-xs ml-1">(.hex)</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  exportPaletteGPL(displayPalette, 'PSX');
+                  toast.success(t('toast.paletteExported'));
+                  setExportDialogOpen(false);
+                }}
+              >
+                GIMP Palette <span className="text-muted-foreground font-mono text-xs ml-1">(.gpl)</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  exportPaletteJSON(displayPalette);
+                  toast.success(t('toast.paletteExported'));
+                  setExportDialogOpen(false);
+                }}
+              >
+                JSON <span className="text-muted-foreground font-mono text-xs ml-1">(.json)</span>
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Color picker */}
@@ -256,6 +336,17 @@ export function TabPalette() {
                 </svg>
               </button>
             )}
+            {hasCustomPalette && (
+              <button
+                onClick={handleDeleteColor}
+                className="w-7 h-7 rounded border border-border flex items-center justify-center text-muted-foreground hover:text-destructive hover:border-destructive/50 transition-colors shrink-0"
+                title="Remove color"
+              >
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
         </motion.div>
@@ -263,7 +354,7 @@ export function TabPalette() {
       </AnimatePresence>
 
       {/* Color count + k-means — only when generating palette from image */}
-      {!hasCustomPalette && (
+      {isGenerated && (
         <>
           <div>
             <div className="flex items-center justify-between mb-1">

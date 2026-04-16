@@ -19,20 +19,62 @@ export function TabDither() {
 
   return (
     <div className="space-y-5">
+      {/* Transparency mode */}
       <div>
-        <div className="flex justify-between items-center mb-1.5">
-          <div className="flex items-center gap-1.5">
-            {alphaChanged && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
-            <Label className="text-[11px]">{t('dither.alphaThreshold')}</Label>
-          </div>
-          <button className="text-[11px] text-muted-foreground font-mono tabular-nums hover:text-primary transition-colors"
-            onClick={() => updateSettings({ alphaThreshold: d.alphaThreshold })}>
-            {settings.alphaThreshold}
-          </button>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Label className="text-[11px]">{t('dither.transparencyMode')}</Label>
         </div>
-        <Slider value={[settings.alphaThreshold]} onValueChange={(val) => updateSettings({ alphaThreshold: sv(val) })}
-          min={0} max={255} step={1} />
+        <Select value={settings.transparencyMode}
+          onValueChange={(v) => { if (v) updateSettings({ transparencyMode: v as typeof settings.transparencyMode }); }}>
+          <SelectTrigger className="h-9 text-[11px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">{t('dither.transparencyNone')}</SelectItem>
+            <SelectItem value="threshold">{t('dither.transparencyThreshold')}</SelectItem>
+            <SelectItem value="color-key">{t('dither.transparencyColorKey')}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+
+      {/* Alpha threshold — only when mode = threshold */}
+      {settings.transparencyMode === 'threshold' && (
+        <div>
+          <div className="flex justify-between items-center mb-1.5">
+            <div className="flex items-center gap-1.5">
+              {alphaChanged && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+              <Label className="text-[11px]">{t('dither.alphaThreshold')}</Label>
+            </div>
+            <button className="text-[11px] text-muted-foreground font-mono tabular-nums hover:text-primary transition-colors"
+              onClick={() => updateSettings({ alphaThreshold: d.alphaThreshold })}>
+              {settings.alphaThreshold}
+            </button>
+          </div>
+          <Slider value={[settings.alphaThreshold]} onValueChange={(val) => updateSettings({ alphaThreshold: sv(val) })}
+            min={0} max={255} step={1} />
+        </div>
+      )}
+
+      {/* Color key — only when mode = color-key */}
+      {settings.transparencyMode === 'color-key' && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-2">
+            <Label className="text-[11px]">{t('dither.colorKey')}</Label>
+            <InfoTip text={t('dither.colorKeyTip')} />
+          </div>
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded border border-border shrink-0"
+              style={{ backgroundColor: settings.colorKeyHex }}
+            />
+            <input
+              type="color"
+              value={settings.colorKeyHex}
+              onChange={(e) => updateSettings({ colorKeyHex: e.target.value })}
+              className="w-9 h-9 rounded border border-border cursor-pointer bg-transparent p-0.5"
+            />
+            <span className="text-[11px] font-mono text-muted-foreground">{settings.colorKeyHex.toUpperCase()}</span>
+          </div>
+        </div>
+      )}
 
       <div>
         <div className="flex items-center gap-1.5 mb-1.5">

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
-import type { ConverterSettings, Preset } from '@/types';
+import type { ConverterSettings, Preset, PaletteColor } from '@/types';
 import { DEFAULT_SETTINGS } from '@/types';
 
 // Throttled localStorage wrapper
@@ -21,22 +21,25 @@ interface ConverterStore {
   sourceImage: string | null;
   resultImage: string | null;
   isProcessing: boolean;
-  activeTab: 'sample' | 'dither' | 'palette' | 'colors';
+  activeTab: 'sample' | 'dither' | 'palette' | 'colors' | 'effects';
   presets: Preset[];
   originalWidth: number;
   originalHeight: number;
   resultWidth: number;
   resultHeight: number;
   sourceFileName: string;
+  generatedPalette: PaletteColor[];
 
   updateSettings: (partial: Partial<ConverterSettings>) => void;
+  setGeneratedPalette: (palette: PaletteColor[]) => void;
   setSourceImage: (base64: string, fileName?: string) => void;
   setResult: (base64: string | null, w?: number, h?: number) => void;
   setIsProcessing: (v: boolean) => void;
-  setActiveTab: (tab: 'sample' | 'dither' | 'palette' | 'colors') => void;
+  setActiveTab: (tab: 'sample' | 'dither' | 'palette' | 'colors' | 'effects') => void;
   setOriginalDimensions: (w: number, h: number) => void;
   savePreset: (name: string) => void;
   loadPreset: (id: string) => void;
+  loadSettings: (settings: ConverterSettings) => void;
   deletePreset: (id: string) => void;
   resetSettings: () => void;
 }
@@ -55,19 +58,25 @@ export const useConverterStore = create<ConverterStore>()(
       resultWidth: 0,
       resultHeight: 0,
       sourceFileName: '',
+      generatedPalette: [],
 
       updateSettings: (partial) =>
         set((state) => ({
           settings: { ...DEFAULT_SETTINGS, ...state.settings, ...partial },
         })),
 
-      setSourceImage: (base64, fileName) => set({
-        sourceImage: base64,
-        resultImage: null,
-        resultWidth: 0,
-        resultHeight: 0,
-        sourceFileName: fileName ? fileName.replace(/\.[^.]+$/, '') : '',
-      }),
+      setGeneratedPalette: (palette) => set({ generatedPalette: palette }),
+
+      setSourceImage: (base64, fileName) => {
+        sessionStorage.removeItem('psx-history');
+        return set({
+          sourceImage: base64,
+          resultImage: null,
+          resultWidth: 0,
+          resultHeight: 0,
+          sourceFileName: fileName ? fileName.replace(/\.[^.]+$/, '') : '',
+        });
+      },
 
       setResult: (base64, w, h) => set({
         resultImage: base64,
@@ -99,6 +108,8 @@ export const useConverterStore = create<ConverterStore>()(
           set({ settings: { ...preset.settings } });
         }
       },
+
+      loadSettings: (settings) => set({ settings: { ...settings } }),
 
       deletePreset: (id) =>
         set((s) => ({ presets: s.presets.filter((p) => p.id !== id) })),

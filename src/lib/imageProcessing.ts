@@ -1,14 +1,77 @@
 import type { ConverterSettings } from '@/types';
 import { applyCRTFilter } from './crtFilter';
 
+export function applyTransparency(
+  imageData: ImageData,
+  settings: Pick<ConverterSettings, 'transparencyMode' | 'alphaThreshold' | 'colorKeyHex'>
+): ImageData {
+  if (settings.transparencyMode === 'none') return imageData;
+  const data = imageData.data;
+
+  if (settings.transparencyMode === 'threshold') {
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < settings.alphaThreshold) {
+        data[i] = 0; data[i + 1] = 0; data[i + 2] = 0; data[i + 3] = 0;
+      }
+    }
+  } else if (settings.transparencyMode === 'color-key') {
+    const hex = settings.colorKeyHex.replace('#', '');
+    const kr = parseInt(hex.slice(0, 2), 16);
+    const kg = parseInt(hex.slice(2, 4), 16);
+    const kb = parseInt(hex.slice(4, 6), 16);
+    const tolerance = 15;
+    for (let i = 0; i < data.length; i += 4) {
+      if (
+        Math.abs(data[i] - kr) <= tolerance &&
+        Math.abs(data[i + 1] - kg) <= tolerance &&
+        Math.abs(data[i + 2] - kb) <= tolerance
+      ) {
+        data[i + 3] = 0;
+      }
+    }
+  }
+  return imageData;
+}
+
+export function applyLevels(
+  imageData: ImageData,
+  settings: Pick<ConverterSettings, 'levelsInLow' | 'levelsInHigh' | 'levelsOutLow' | 'levelsOutHigh'>
+): void {
+  const { levelsInLow: inLow, levelsInHigh: inHigh, levelsOutLow: outLow, levelsOutHigh: outHigh } = settings;
+  if (inLow === 0 && inHigh === 255 && outLow === 0 && outHigh === 255) return;
+  const inRange = Math.max(1, inHigh - inLow);
+  const outRange = outHigh - outLow;
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    for (let c = 0; c < 3; c++) {
+      const norm = Math.max(0, Math.min(1, (data[i + c] - inLow) / inRange));
+      data[i + c] = Math.round(outLow + norm * outRange);
+    }
+  }
+}
+
+export function applyGrain(imageData: ImageData, amount: number): void {
+  if (amount <= 0) return;
+  const data = imageData.data;
+  const strength = amount * 255 * 0.25;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    const noise = (Math.random() - 0.5) * 2 * strength;
+    data[i]     = Math.max(0, Math.min(255, data[i]     + noise));
+    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+  }
+}
+
 export function applyColorAdjustments(
   imageData: ImageData,
   settings: Pick<ConverterSettings,
     'brightness' | 'contrast' | 'saturation' |
-    'hue' | 'gamma' | 'tintRed' | 'tintGreen' | 'tintBlue'>
+    'hue' | 'gamma' | 'tintRed' | 'tintGreen' | 'tintBlue' | 'posterize'>
 ): ImageData {
   const data = imageData.data;
-  const { brightness, contrast, saturation, hue, gamma, tintRed, tintGreen, tintBlue } = settings;
+  const { brightness, contrast, saturation, hue, gamma, tintRed, tintGreen, tintBlue, posterize } = settings;
 
   for (let i = 0; i < data.length; i += 4) {
     let r = data[i], g = data[i + 1], b = data[i + 2];
@@ -58,6 +121,14 @@ export function applyColorAdjustments(
     r = (r * tintRed) / 255;
     g = (g * tintGreen) / 255;
     b = (b * tintBlue) / 255;
+
+    // Posterize
+    if (posterize >= 2) {
+      const step = 255 / (posterize - 1);
+      r = Math.round(r / step) * step;
+      g = Math.round(g / step) * step;
+      b = Math.round(b / step) * step;
+    }
 
     // Clamp
     data[i] = Math.max(0, Math.min(255, Math.round(r)));
@@ -252,9 +323,12 @@ export function processFastPreview(
   // 2. Blur on small canvas
   current = applyBlur(current, settings.blurAmount);
 
-  // 3. Color adjustments on small canvas (~16K pixels)
+  // 3. Transparency + levels + color adjustments + grain on small canvas (~16K pixels)
   const colorData = canvasToImageData(current);
+  applyTransparency(colorData, settings);
+  applyLevels(colorData, settings);
   applyColorAdjustments(colorData, settings);
+  applyGrain(colorData, settings.grainAmount);
   current = imageDataToCanvas(colorData);
 
   // 4. Sharpen on small canvas
@@ -278,13 +352,15 @@ export function processFastPreview(
 export async function processFullPipeline(
   sourceBase64: string,
   settings: ConverterSettings
-): Promise<{ resultBase64: string; resultCanvas: HTMLCanvasElement }> {
+): Promise<{ resultBase64: string; resultCanvas: HTMLCanvasElement; generatedPalette: import('@/types').PaletteColor[] }> {
   const { default: quantizeImage } = await import('./quantization');
 
   const sourceCanvas = await getCachedSource(sourceBase64);
 
-  // Color adjustments
+  // Transparency + levels + color adjustments
   const colorData = canvasToImageData(sourceCanvas);
+  applyTransparency(colorData, settings);
+  applyLevels(colorData, settings);
   applyColorAdjustments(colorData, settings);
   let current = imageDataToCanvas(colorData);
 
@@ -298,9 +374,14 @@ export async function processFullPipeline(
   // Sharpen
   current = applySharpen(current, settings.sharpenAmount);
 
+  // Grain (after quantization for full pipeline feel, applied pre-quantize for consistency)
+  const preQuantData = canvasToImageData(current);
+  applyGrain(preQuantData, settings.grainAmount);
+  current = imageDataToCanvas(preQuantData);
+
   // Quantization
   const quantData = canvasToImageData(current);
-  const quantized = await quantizeImage(quantData, settings);
+  const { imageData: quantized, generatedPalette } = await quantizeImage(quantData, settings);
   let resultCanvas = imageDataToCanvas(quantized);
 
   // CRT effect
@@ -315,5 +396,5 @@ export async function processFullPipeline(
   }
 
   const resultBase64 = resultCanvas.toDataURL('image/png');
-  return { resultBase64, resultCanvas };
+  return { resultBase64, resultCanvas, generatedPalette };
 }

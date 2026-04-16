@@ -26,6 +26,7 @@ const translations = {
     'tab.dither': 'Dither',
     'tab.palette': 'Palette',
     'tab.colors': 'Colors',
+    'tab.effects': 'Effects',
 
     // Tab Sample
     'sample.absolute': 'Absolute (px)',
@@ -108,6 +109,8 @@ const translations = {
     'preset.namePlaceholder': 'Preset name...',
     'preset.noPresets': 'No saved presets',
     'preset.delete': 'Delete',
+    'preset.factory': 'Built-in',
+    'preset.userPresets': 'Your Presets',
 
     // Toasts
     'toast.exported': 'PNG exported',
@@ -140,11 +143,58 @@ const translations = {
 
     // History
     'sidebar.history': 'History',
+    'sidebar.clearHistory': 'Clear history',
 
     // Batch export
     'export.batch': 'Batch Export',
     'export.batchTitle': 'Export Multiple Sizes',
     'export.download': 'Download All',
+    'toast.zipExported': 'ZIP exported',
+
+    // Posterize
+    'colors.posterize': 'Posterize',
+    'colors.posterizeTip': 'Reduces the number of tones per channel. 0 = off. Lower values create a more graphic, retro look.',
+
+    // Transparency
+    'dither.transparencyMode': 'Transparency Mode',
+    'dither.transparencyNone': 'None',
+    'dither.transparencyThreshold': 'Alpha Threshold',
+    'dither.transparencyColorKey': 'Color Key',
+    'dither.colorKey': 'Key Color',
+    'dither.colorKeyTip': 'Pixels matching the selected color will become transparent before processing. Default: magenta (#FF00FF).',
+
+    // Grid / Tile overlay
+    'preview.showGrid': 'Show pixel grid',
+    'preview.hideGrid': 'Hide pixel grid',
+    'preview.showTile': 'Show tiled (3×3)',
+    'preview.hideTile': 'Hide tiled',
+
+    // Palette export
+    'palette.exportTitle': 'Export Palette',
+    'palette.exportFormat': 'Choose a format:',
+    'palette.generatedColors': 'Generated Colors',
+    'toast.paletteExported': 'Palette exported',
+
+    // Examples gallery
+    'dropzone.examples': 'Or try an example',
+    'dropzone.exampleLoaded': 'Example loaded',
+
+    // Compare presets
+    'preset.compare': 'Compare',
+    'preset.compareTitle': 'Compare Preset',
+    'preset.currentSettings': 'Current',
+    'preset.processing': 'Processing...',
+
+    // Film Grain
+    'effects.grain': 'Film Grain',
+    'effects.grainTip': 'Adds analog noise to the image. Simulates film or CRT sensor grain.',
+
+    // Levels
+    'colors.levels': 'Levels',
+    'colors.levelsInLow': 'Input Black',
+    'colors.levelsInHigh': 'Input White',
+    'colors.levelsOutLow': 'Output Black',
+    'colors.levelsOutHigh': 'Output White',
   },
   es: {
     'header.processing': 'Aplicando paleta...',
@@ -168,6 +218,7 @@ const translations = {
     'tab.dither': 'Dither',
     'tab.palette': 'Paleta',
     'tab.colors': 'Colores',
+    'tab.effects': 'Efectos',
 
     'sample.absolute': 'Absoluto (px)',
     'sample.relative': 'Relativo (%)',
@@ -243,6 +294,8 @@ const translations = {
     'preset.namePlaceholder': 'Nombre del preset...',
     'preset.noPresets': 'No hay presets guardados',
     'preset.delete': 'Eliminar',
+    'preset.factory': 'Incluidos',
+    'preset.userPresets': 'Tus Presets',
 
     'toast.exported': 'PNG exportado',
     'toast.noResult': 'No hay resultado para exportar',
@@ -270,10 +323,51 @@ const translations = {
     'shortcuts.help': 'Mostrar atajos',
 
     'sidebar.history': 'Historial',
+    'sidebar.clearHistory': 'Limpiar historial',
 
     'export.batch': 'Exportar en lote',
     'export.batchTitle': 'Exportar Múltiples Tamaños',
     'export.download': 'Descargar Todo',
+    'toast.zipExported': 'ZIP exportado',
+
+    'colors.posterize': 'Posterizar',
+    'colors.posterizeTip': 'Reduce la cantidad de tonos por canal. 0 = desactivado. Valores menores crean un look más gráfico y retro.',
+
+    'dither.transparencyMode': 'Modo de Transparencia',
+    'dither.transparencyNone': 'Ninguno',
+    'dither.transparencyThreshold': 'Umbral Alpha',
+    'dither.transparencyColorKey': 'Color Clave',
+    'dither.colorKey': 'Color Clave',
+    'dither.colorKeyTip': 'Los píxeles que coincidan con el color seleccionado se volverán transparentes antes de procesar. Por defecto: magenta (#FF00FF).',
+
+    'preview.showGrid': 'Mostrar grilla de píxeles',
+    'preview.hideGrid': 'Ocultar grilla de píxeles',
+    'preview.showTile': 'Ver tileado (3×3)',
+    'preview.hideTile': 'Ocultar tileado',
+
+    'palette.exportTitle': 'Exportar Paleta',
+    'palette.exportFormat': 'Elegir formato:',
+    'palette.generatedColors': 'Colores Generados',
+    'toast.paletteExported': 'Paleta exportada',
+
+    'dropzone.examples': 'O probá un ejemplo',
+    'dropzone.exampleLoaded': 'Ejemplo cargado',
+
+    'preset.compare': 'Comparar',
+    'preset.compareTitle': 'Comparar Preset',
+    'preset.currentSettings': 'Actual',
+    'preset.processing': 'Procesando...',
+
+    // Film Grain
+    'effects.grain': 'Grano de Película',
+    'effects.grainTip': 'Agrega ruido analógico a la imagen. Simula grano de película o sensor CRT.',
+
+    // Levels
+    'colors.levels': 'Niveles',
+    'colors.levelsInLow': 'Negro de entrada',
+    'colors.levelsInHigh': 'Blanco de entrada',
+    'colors.levelsOutLow': 'Negro de salida',
+    'colors.levelsOutHigh': 'Blanco de salida',
   },
 } as const;
 

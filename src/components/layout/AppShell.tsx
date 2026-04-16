@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import JSZip from 'jszip';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useConverterStore } from '@/store/converterStore';
@@ -74,19 +75,31 @@ export function AppShell() {
     if (!source) return;
 
     setBatchExporting(true);
-    for (const size of batchSizes) {
-      try {
-        const batchSettings = { ...settings, width: size, height: size, sizeMode: 'absolute' as const };
-        const { resultCanvas } = await processFullPipeline(source, batchSettings);
-        const name = getExportFilename(size, size);
-        exportPNG(resultCanvas, name);
-        await new Promise(r => setTimeout(r, 300)); // small delay between downloads
-      } catch { /* skip failed */ }
-    }
+    try {
+      const zip = new JSZip();
+      for (const size of batchSizes) {
+        try {
+          const batchSettings = { ...settings, width: size, height: size, sizeMode: 'absolute' as const };
+          const { resultCanvas } = await processFullPipeline(source, batchSettings);
+          const blob = await new Promise<Blob>((res, rej) =>
+            resultCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
+          );
+          zip.file(getExportFilename(size, size), blob);
+        } catch { /* skip failed size */ }
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const storeName = useConverterStore.getState().sourceFileName || 'psx-texture';
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${storeName}_batch.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(t('toast.zipExported'));
+    } catch { /* zip failed */ }
     setBatchExporting(false);
-    toast.success(`${batchSizes.length} PNGs exported`);
     setShowBatchExport(false);
-  }, [batchSizes, getExportFilename]);
+  }, [batchSizes, getExportFilename, t]);
 
   // --- Drop on preview (replace image) ---
   const handleDropOnPreview = useCallback((e: React.DragEvent) => {

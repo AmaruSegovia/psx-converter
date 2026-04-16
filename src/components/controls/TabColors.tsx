@@ -2,7 +2,7 @@ import { useConverterStore } from '@/store/converterStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Checkbox } from '@/components/ui/checkbox';
+import { InfoTip } from '@/components/ui/info-tip';
 import { DEFAULT_SETTINGS } from '@/types';
 
 interface SliderControlProps {
@@ -78,28 +78,20 @@ export function TabColors() {
           format={(v) => String(Math.round(v))} />
       </div>
 
-      {/* CRT Effect */}
       <div className="pt-3 border-t border-border space-y-5">
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="crt-enabled"
-            checked={settings.crtEnabled}
-            onCheckedChange={(v) => updateSettings({ crtEnabled: !!v })}
-          />
-          <Label htmlFor="crt-enabled" className="text-[11px] uppercase tracking-wider text-muted-foreground/70">{t('colors.crt')}</Label>
-        </div>
-
-        {settings.crtEnabled && (
-          <>
-            <SliderControl label={t('colors.scanlines')} value={settings.crtScanlines} defaultValue={d.crtScanlines}
-              onChange={(v) => updateSettings({ crtScanlines: v })} min={0} max={0.5} step={0.01} />
-            <SliderControl label={t('colors.rgbShift')} value={settings.crtRgbShift} defaultValue={d.crtRgbShift}
-              onChange={(v) => updateSettings({ crtRgbShift: v })} min={0} max={5} step={0.1}
-              format={(v) => `${v.toFixed(1)}px`} />
-            <SliderControl label={t('colors.vignette')} value={settings.crtVignette} defaultValue={d.crtVignette}
-              onChange={(v) => updateSettings({ crtVignette: v })} min={0} max={0.8} step={0.01} />
-          </>
-        )}
+        <Label className="text-[11px] text-muted-foreground/70 uppercase tracking-wider">{t('colors.levels')}</Label>
+        <SliderControl label={t('colors.levelsInLow')} value={settings.levelsInLow} defaultValue={d.levelsInLow}
+          onChange={(v) => updateSettings({ levelsInLow: v })} min={0} max={254} step={1}
+          format={(v) => String(Math.round(v))} />
+        <SliderControl label={t('colors.levelsInHigh')} value={settings.levelsInHigh} defaultValue={d.levelsInHigh}
+          onChange={(v) => updateSettings({ levelsInHigh: v })} min={1} max={255} step={1}
+          format={(v) => String(Math.round(v))} />
+        <SliderControl label={t('colors.levelsOutLow')} value={settings.levelsOutLow} defaultValue={d.levelsOutLow}
+          onChange={(v) => updateSettings({ levelsOutLow: v })} min={0} max={254} step={1}
+          format={(v) => String(Math.round(v))} />
+        <SliderControl label={t('colors.levelsOutHigh')} value={settings.levelsOutHigh} defaultValue={d.levelsOutHigh}
+          onChange={(v) => updateSettings({ levelsOutHigh: v })} min={1} max={255} step={1}
+          format={(v) => String(Math.round(v))} />
       </div>
     </div>
   );

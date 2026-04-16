@@ -11,6 +11,8 @@ export interface ConverterSettings {
 
   // Tab Dither
   alphaThreshold: number;
+  transparencyMode: 'none' | 'threshold' | 'color-key';
+  colorKeyHex: string;
   distanceMetric: 'euclidean' | 'manhattan' | 'ciede2000' | 'rgb-redmean';
   ditherMode: 'none' | 'floyd-steinberg' | 'jarvis' | 'bayer-2x2' | 'bayer-4x4' | 'bayer-8x8';
   ditherAmount: number;
@@ -23,6 +25,7 @@ export interface ConverterSettings {
   lospecSlug: string;
 
   // Tab Colors
+  posterize: number;
   brightness: number;
   contrast: number;
   saturation: number;
@@ -37,6 +40,15 @@ export interface ConverterSettings {
   crtScanlines: number;   // 0-1
   crtRgbShift: number;    // 0-5 px
   crtVignette: number;    // 0-1
+
+  // Grain
+  grainAmount: number;    // 0-1
+
+  // Levels
+  levelsInLow: number;    // 0-254
+  levelsInHigh: number;   // 1-255
+  levelsOutLow: number;   // 0-254
+  levelsOutHigh: number;  // 1-255
 }
 
 export interface PaletteColor {
@@ -60,6 +72,13 @@ export interface LospecPaletteResponse {
   colors: string[];
 }
 
+export interface ExampleImage {
+  id: string;
+  name: string;
+  filename: string;
+  suggestedSettings: Partial<ConverterSettings>;
+}
+
 export const DEFAULT_SETTINGS: ConverterSettings = {
   width: 128,
   height: 128,
@@ -70,6 +89,8 @@ export const DEFAULT_SETTINGS: ConverterSettings = {
   blurAmount: 0,
   sharpenAmount: 0,
   alphaThreshold: 128,
+  transparencyMode: 'none',
+  colorKeyHex: '#FF00FF',
   distanceMetric: 'rgb-redmean',
   ditherMode: 'floyd-steinberg',
   ditherAmount: 0.2,
@@ -78,6 +99,7 @@ export const DEFAULT_SETTINGS: ConverterSettings = {
   palette: [],
   paletteSource: 'generated',
   lospecSlug: '',
+  posterize: 0,
   brightness: 0,
   contrast: 1.0,
   saturation: 1.0,
@@ -90,4 +112,9 @@ export const DEFAULT_SETTINGS: ConverterSettings = {
   crtScanlines: 0.15,
   crtRgbShift: 1,
   crtVignette: 0.3,
+  grainAmount: 0,
+  levelsInLow: 0,
+  levelsInHigh: 255,
+  levelsOutLow: 0,
+  levelsOutHigh: 255,
 };

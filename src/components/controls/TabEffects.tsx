@@ -1,0 +1,136 @@
+import { useConverterStore } from '@/store/converterStore';
+import { useTranslation } from '@/hooks/useTranslation';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
+import { InfoTip } from '@/components/ui/info-tip';
+import { DEFAULT_SETTINGS } from '@/types';
+
+interface SliderControlProps {
+  label: string;
+  value: number;
+  defaultValue: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  step: number;
+  format?: (v: number) => string;
+  tip?: string;
+}
+
+function SliderControl({ label, value, defaultValue, onChange, min, max, step, format, tip }: SliderControlProps) {
+  const isChanged = Math.abs(value - defaultValue) > step * 0.5;
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-1.5">
+        <div className="flex items-center gap-1.5">
+          {isChanged && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+          <Label className="text-[11px]">{label}</Label>
+          {tip && <InfoTip text={tip} />}
+        </div>
+        <button
+          className="text-[11px] text-muted-foreground font-mono tabular-nums hover:text-primary transition-colors"
+          onClick={() => onChange(defaultValue)}
+          title="Click to reset"
+        >
+          {format ? format(value) : value.toFixed(2)}
+        </button>
+      </div>
+      <Slider
+        value={[value]}
+        onValueChange={(val) => onChange(Array.isArray(val) ? val[0] : val)}
+        min={min}
+        max={max}
+        step={step}
+      />
+    </div>
+  );
+}
+
+export function TabEffects() {
+  const { t } = useTranslation();
+  const settings = useConverterStore((s) => s.settings);
+  const updateSettings = useConverterStore((s) => s.updateSettings);
+  const d = DEFAULT_SETTINGS;
+
+  return (
+    <div className="space-y-5">
+      {/* Posterize */}
+      <div>
+        <div className="flex justify-between items-center mb-1.5">
+          <div className="flex items-center gap-1.5">
+            {settings.posterize >= 2 && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+            <Label className="text-[11px]">{t('colors.posterize')}</Label>
+            <InfoTip text={t('colors.posterizeTip')} />
+          </div>
+          <button
+            className="text-[11px] text-muted-foreground font-mono tabular-nums hover:text-primary transition-colors"
+            onClick={() => updateSettings({ posterize: d.posterize })}
+          >
+            {settings.posterize === 0 ? 'Off' : String(settings.posterize)}
+          </button>
+        </div>
+        <Slider
+          value={[settings.posterize]}
+          onValueChange={(val) => updateSettings({ posterize: Array.isArray(val) ? val[0] : val })}
+          min={0}
+          max={8}
+          step={1}
+        />
+      </div>
+
+      {/* Film Grain */}
+      <SliderControl
+        label={t('effects.grain')}
+        tip={t('effects.grainTip')}
+        value={settings.grainAmount}
+        defaultValue={d.grainAmount}
+        onChange={(v) => updateSettings({ grainAmount: v })}
+        min={0} max={1} step={0.01}
+        format={(v) => v === 0 ? 'Off' : `${Math.round(v * 100)}%`}
+      />
+
+      {/* CRT Effect */}
+      <div className="pt-3 border-t border-border space-y-5">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="crt-enabled"
+            checked={settings.crtEnabled}
+            onCheckedChange={(v) => updateSettings({ crtEnabled: !!v })}
+          />
+          <Label htmlFor="crt-enabled" className="text-[11px] uppercase tracking-wider text-muted-foreground/70">
+            {t('colors.crt')}
+          </Label>
+        </div>
+
+        {settings.crtEnabled && (
+          <>
+            <SliderControl
+              label={t('colors.scanlines')}
+              value={settings.crtScanlines}
+              defaultValue={d.crtScanlines}
+              onChange={(v) => updateSettings({ crtScanlines: v })}
+              min={0} max={0.5} step={0.01}
+            />
+            <SliderControl
+              label={t('colors.rgbShift')}
+              value={settings.crtRgbShift}
+              defaultValue={d.crtRgbShift}
+              onChange={(v) => updateSettings({ crtRgbShift: v })}
+              min={0} max={5} step={0.1}
+              format={(v) => `${v.toFixed(1)}px`}
+            />
+            <SliderControl
+              label={t('colors.vignette')}
+              value={settings.crtVignette}
+              defaultValue={d.crtVignette}
+              onChange={(v) => updateSettings({ crtVignette: v })}
+              min={0} max={0.8} step={0.01}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

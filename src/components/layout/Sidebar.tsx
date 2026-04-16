@@ -9,15 +9,17 @@ import { TabSample } from '@/components/controls/TabSample';
 import { TabDither } from '@/components/controls/TabDither';
 import { TabPalette } from '@/components/controls/TabPalette';
 import { TabColors } from '@/components/controls/TabColors';
+import { TabEffects } from '@/components/controls/TabEffects';
 import { PresetSaveDialog, PresetLoadDialog } from '@/components/presets/PresetManager';
-import { useUndoRedo } from '@/hooks/useUndoRedo';
+import { useUndoRedo, setPendingHistoryLabel } from '@/hooks/useUndoRedo';
 
 export function Sidebar() {
   const { t } = useTranslation();
   const activeTab = useConverterStore((s) => s.activeTab);
   const setActiveTab = useConverterStore((s) => s.setActiveTab);
   const resetSettings = useConverterStore((s) => s.resetSettings);
-  const { undo, redo, historyIndex, historyLength, navigateHistory } = useUndoRedo();
+  const { undo, redo, historyIndex, historyLength, navigateHistory, clearHistory, getEntryLabel } = useUndoRedo();
+  const currentLabel = historyIndex >= 0 ? getEntryLabel(historyIndex) : '';
 
   return (
     <div className="w-[420px] border-r border-border flex flex-col bg-card/60 backdrop-blur-sm">
@@ -36,7 +38,7 @@ export function Sidebar() {
           size="sm"
           variant="ghost"
           className="text-[11px] h-7 px-2 text-muted-foreground hover:text-foreground"
-          onClick={() => { resetSettings(); toast.success(t('toast.settingsReset')); }}
+          onClick={() => { setPendingHistoryLabel('Reset'); resetSettings(); toast.success(t('toast.settingsReset')); }}
         >
           {t('sidebar.reset')}
         </Button>
@@ -44,22 +46,36 @@ export function Sidebar() {
 
       {/* History timeline */}
       {historyLength > 1 && (
-        <div className="px-4 py-1.5 border-b border-border flex items-center gap-2">
-          <span className="text-[9px] text-muted-foreground/50 shrink-0">{t('sidebar.history')}</span>
-          <div className="flex-1 flex items-center gap-px h-3">
-            {Array.from({ length: historyLength }, (_, i) => (
-              <button
-                key={i}
-                onClick={() => navigateHistory(i)}
-                className={`flex-1 h-1.5 rounded-full transition-colors min-w-[3px] ${
-                  i === historyIndex ? 'bg-primary' :
-                  i < historyIndex ? 'bg-primary/30' : 'bg-muted-foreground/15'
-                }`}
-                title={`${i + 1}/${historyLength}`}
-              />
-            ))}
+        <div className="px-4 py-1.5 border-b border-border flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-muted-foreground/50 shrink-0">{t('sidebar.history')}</span>
+            <div className="flex-1 flex items-center gap-px h-3">
+              {Array.from({ length: historyLength }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => navigateHistory(i)}
+                  className={`flex-1 h-1.5 rounded-full transition-colors min-w-[3px] hover:h-2 ${
+                    i === historyIndex ? 'bg-primary' :
+                    i < historyIndex ? 'bg-primary/30' : 'bg-muted-foreground/15'
+                  }`}
+                  title={`${i + 1}/${historyLength} — ${getEntryLabel(i)}`}
+                />
+              ))}
+            </div>
+            <button
+              onClick={clearHistory}
+              className="text-[9px] text-muted-foreground/40 hover:text-destructive transition-colors shrink-0"
+              title={t('sidebar.clearHistory')}
+            >
+              ✕
+            </button>
+            <span className="text-[9px] text-muted-foreground/40 font-mono shrink-0">{historyIndex + 1}/{historyLength}</span>
           </div>
-          <span className="text-[9px] text-muted-foreground/40 font-mono shrink-0">{historyIndex + 1}/{historyLength}</span>
+          {currentLabel && (
+            <span className="text-[10px] text-muted-foreground/60 truncate" title={currentLabel}>
+              {currentLabel}
+            </span>
+          )}
         </div>
       )}
 
@@ -68,22 +84,26 @@ export function Sidebar() {
         onValueChange={(v) => setActiveTab(v as typeof activeTab)}
         className="flex flex-col flex-1 overflow-hidden"
       >
-        <TabsList className="grid grid-cols-4 mx-4 mt-3 bg-muted/50 h-9">
-          <TabsTrigger value="sample" className="text-[11px] gap-1.5 data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 15l6-6 4 4 8-8" /></svg>
+        <TabsList className="grid grid-cols-5 mx-4 mt-3 bg-muted/50 h-9">
+          <TabsTrigger value="sample" className="text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1">
+            <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 15l6-6 4 4 8-8" /></svg>
             {t('tab.resize')}
           </TabsTrigger>
-          <TabsTrigger value="dither" className="text-[11px] gap-1.5 data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="6" cy="6" r="1.5" /><circle cx="18" cy="6" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="6" cy="18" r="1.5" /><circle cx="18" cy="18" r="1.5" /></svg>
+          <TabsTrigger value="dither" className="text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1">
+            <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="6" cy="6" r="1.5" /><circle cx="18" cy="6" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="6" cy="18" r="1.5" /><circle cx="18" cy="18" r="1.5" /></svg>
             {t('tab.dither')}
           </TabsTrigger>
-          <TabsTrigger value="palette" className="text-[11px] gap-1.5 data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="8" r="2" /><circle cx="8" cy="14" r="2" /><circle cx="16" cy="14" r="2" /></svg>
+          <TabsTrigger value="palette" className="text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1">
+            <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="8" r="2" /><circle cx="8" cy="14" r="2" /><circle cx="16" cy="14" r="2" /></svg>
             {t('tab.palette')}
           </TabsTrigger>
-          <TabsTrigger value="colors" className="text-[11px] gap-1.5 data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><path d="M12 2v20M2 12h20" /><path d="M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" /></svg>
+          <TabsTrigger value="colors" className="text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1">
+            <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><path d="M12 2v20M2 12h20" /><path d="M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" /></svg>
             {t('tab.colors')}
+          </TabsTrigger>
+          <TabsTrigger value="effects" className="text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1">
+            <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" /><path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75z" /><path d="M5 17l.5 1.5L7 19l-1.5.5L5 21l-.5-1.5L3 19l1.5-.5z" /></svg>
+            {t('tab.effects')}
           </TabsTrigger>
         </TabsList>
 
@@ -93,6 +113,7 @@ export function Sidebar() {
             <TabsContent value="dither" className="mt-0"><TabDither /></TabsContent>
             <TabsContent value="palette" className="mt-0"><TabPalette /></TabsContent>
             <TabsContent value="colors" className="mt-0"><TabColors /></TabsContent>
+            <TabsContent value="effects" className="mt-0"><TabEffects /></TabsContent>
           </div>
         </ScrollArea>
       </Tabs>

@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useConverterStore } from '@/store/converterStore';
 import { loadImage } from '@/lib/imageProcessing';
+import { EXAMPLE_IMAGES } from '@/data/examples';
+import type { ExampleImage } from '@/types';
 
 export function ImageDropzone() {
   const { t } = useTranslation();
@@ -60,10 +62,39 @@ export function ImageDropzone() {
     input.click();
   }, [handleFile]);
 
+  const handleExampleLoad = useCallback(async (ex: ExampleImage) => {
+    try {
+      const url = `${import.meta.env.BASE_URL}examples/${ex.filename}`;
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const b64 = e.target?.result as string;
+        setSourceImage(b64, ex.name);
+        const img = await loadImage(b64);
+        const iw = img.naturalWidth;
+        const ih = img.naturalHeight;
+        setOriginalDimensions(iw, ih);
+
+        // Clamp suggested absolute dimensions to actual image size
+        const suggested = { ...ex.suggestedSettings };
+        const targetMode = suggested.sizeMode ?? useConverterStore.getState().settings.sizeMode;
+        if (targetMode === 'absolute') {
+          if (suggested.width !== undefined) suggested.width = Math.min(suggested.width, iw);
+          if (suggested.height !== undefined) suggested.height = Math.min(suggested.height, ih);
+        }
+
+        updateSettings(suggested);
+        toast.success(t('dropzone.exampleLoaded'));
+      };
+      reader.readAsDataURL(blob);
+    } catch { /* fetch failed */ }
+  }, [setSourceImage, setOriginalDimensions, updateSettings, t]);
+
   if (sourceImage) return null;
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center canvas-checkerboard">
+    <div className="absolute inset-0 flex flex-col items-center justify-center canvas-checkerboard overflow-y-auto py-6 gap-6">
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -106,6 +137,34 @@ export function ImageDropzone() {
           ))}
         </div>
       </motion.div>
+
+      {/* Examples gallery */}
+      <div className="text-center">
+        <p className="text-[9px] text-muted-foreground/30 mb-3 uppercase tracking-widest">
+          {t('dropzone.examples')}
+        </p>
+        <div className="flex gap-3 flex-wrap justify-center">
+          {EXAMPLE_IMAGES.map((ex) => (
+            <button
+              key={ex.id}
+              onClick={() => handleExampleLoad(ex)}
+              className="group flex flex-col items-center gap-1 hover:scale-105 transition-transform"
+            >
+              <div className="w-12 h-12 rounded border border-border/30 overflow-hidden bg-muted/20 group-hover:border-primary/40 transition-colors">
+                <img
+                  src={`${import.meta.env.BASE_URL}examples/${ex.filename}`}
+                  alt={ex.name}
+                  className="w-full h-full object-cover"
+                  style={{ imageRendering: 'pixelated' }}
+                />
+              </div>
+              <span className="text-[9px] text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors">
+                {ex.name}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
