@@ -20,8 +20,9 @@ export function PresetSaveDialog() {
 
   const handleSave = () => {
     if (!name.trim()) return;
-    savePreset(name.trim());
-    toast.success(`Preset "${name.trim()}" saved`);
+    const trimmed = name.trim();
+    savePreset(trimmed);
+    toast.success(t('toast.presetSaved', { name: trimmed }));
     setName('');
     setOpen(false);
   };
@@ -92,6 +93,7 @@ export function PresetLoadDialog() {
 
   useEffect(() => {
     if (!open || !sourceImage) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (!sourceImage) setPreviews({});
       return;
     }
@@ -142,7 +144,7 @@ export function PresetLoadDialog() {
   const handleLoadUser = (id: string, name: string) => {
     setPendingHistoryLabel(`Preset: ${name}`);
     loadPreset(id);
-    toast.success(`Loaded "${name}"`);
+    toast.success(t('toast.presetLoaded', { name }));
     setOpen(false);
   };
 
@@ -153,7 +155,7 @@ export function PresetLoadDialog() {
     const maxDim = presetMaxDim(settings);
     const { w, h } = dimsFromAspect(originalWidth, originalHeight, maxDim);
     loadSettings({ ...settings, width: w, height: h, sizeMode: 'absolute' });
-    toast.success(`Loaded "${name}"`);
+    toast.success(t('toast.presetLoaded', { name }));
     setOpen(false);
   };
 

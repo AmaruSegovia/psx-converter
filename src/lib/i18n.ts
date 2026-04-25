@@ -1,4 +1,4 @@
-const translations = {
+export const translations = {
   en: {
     // Header
     'header.processing': 'Applying palette...',
@@ -54,8 +54,6 @@ const translations = {
     'sample.nearest': 'Nearest Neighbor',
     'sample.bilinear': 'Bilinear',
     'sample.bicubic': 'Bicubic',
-    'sample.offsetX': 'Sample X Offset',
-    'sample.offsetY': 'Sample Y Offset',
     'sample.blur': 'Blur Amount',
     'sample.sharpen': 'Sharpen Amount',
     'sample.lockAspect': 'Lock aspect ratio',
@@ -90,6 +88,7 @@ const translations = {
     'palette.builtinPlaceholder': 'Select palette...',
     'palette.addColor': 'Add color',
     'palette.pickScreen': 'Pick color from screen',
+    'palette.removeColor': 'Remove color',
 
     // Tab Colors
     'colors.brightness': 'Brightness',
@@ -137,11 +136,16 @@ const translations = {
     'toast.settingsReset': 'Settings reset',
     'toast.imageRemoved': 'Image removed',
     'toast.processingFailed': 'Processing failed',
-    'toast.colorPicked': 'Color picked',
-    'toast.colorAdded': 'Added to palette',
+    'toast.colorPicked': 'Color picked: {hex}',
+    'toast.colorAdded': 'Added {hex} to palette',
     'toast.noColors': 'No colors found in file',
     'toast.copied': 'Copied to clipboard',
     'toast.copyFailed': 'Failed to copy',
+    'toast.presetSaved': 'Preset "{name}" saved',
+    'toast.presetLoaded': 'Loaded "{name}"',
+    'toast.presetDeleted': 'Deleted "{name}"',
+    'toast.lospecImported': 'Imported {count} colors from Lospec',
+    'toast.fileImported': 'Imported {count} colors from file',
 
     // Clipboard & smart export
     'header.copy': 'Copy',
@@ -275,8 +279,6 @@ const translations = {
     'sample.nearest': 'Nearest',
     'sample.bilinear': 'Bilinear',
     'sample.bicubic': 'Bicubic',
-    'sample.offsetX': 'Offset X',
-    'sample.offsetY': 'Offset Y',
     'sample.blur': 'Desenfoque',
     'sample.sharpen': 'Nitidez',
     'sample.lockAspect': 'Bloquear proporción',
@@ -309,6 +311,7 @@ const translations = {
     'palette.builtinPlaceholder': 'Elegir paleta...',
     'palette.addColor': 'Agregar color',
     'palette.pickScreen': 'Tomar color de pantalla',
+    'palette.removeColor': 'Quitar color',
 
     'colors.brightness': 'Brillo',
     'colors.contrast': 'Contraste',
@@ -351,11 +354,16 @@ const translations = {
     'toast.settingsReset': 'Configuración reiniciada',
     'toast.imageRemoved': 'Imagen eliminada',
     'toast.processingFailed': 'Error al procesar',
-    'toast.colorPicked': 'Color seleccionado',
-    'toast.colorAdded': 'Agregado a la paleta',
+    'toast.colorPicked': 'Color seleccionado: {hex}',
+    'toast.colorAdded': '{hex} agregado a la paleta',
     'toast.noColors': 'No se encontraron colores en el archivo',
     'toast.copied': 'Copiado al portapapeles',
     'toast.copyFailed': 'Error al copiar',
+    'toast.presetSaved': 'Preset "{name}" guardado',
+    'toast.presetLoaded': '"{name}" cargado',
+    'toast.presetDeleted': '"{name}" eliminado',
+    'toast.lospecImported': 'Importados {count} colores de Lospec',
+    'toast.fileImported': 'Importados {count} colores del archivo',
 
     'header.copy': 'Copiar',
     'header.copyTitle': 'Copiar al portapapeles (Ctrl+C)',
@@ -446,8 +454,13 @@ export function setLocale(locale: Locale) {
   for (const fn of _listeners) fn();
 }
 
-export function t(key: TranslationKey): string {
-  return translations[_locale][key] ?? translations.en[key] ?? key;
+export function t(key: TranslationKey, vars?: Record<string, string | number>): string {
+  const raw = translations[_locale][key] ?? translations.en[key] ?? key;
+  if (!vars) return raw;
+  return raw.replace(/\{(\w+)\}/g, (_, k) => {
+    const v = vars[k];
+    return v === undefined ? `{${k}}` : String(v);
+  });
 }
 
 export function subscribeLocale(fn: () => void): () => void {

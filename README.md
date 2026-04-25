@@ -1,8 +1,24 @@
 # PSX Texture Converter
 
+[![CI](https://github.com/AmaruSegovia/psx-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/AmaruSegovia/psx-converter/actions/workflows/ci.yml)
+[![Deploy](https://github.com/AmaruSegovia/psx-converter/actions/workflows/deploy.yml/badge.svg)](https://github.com/AmaruSegovia/psx-converter/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+![PWA installable](https://img.shields.io/badge/PWA-installable-7c3aed)
+![100%25 client-side](https://img.shields.io/badge/100%25-client--side-22c55e)
+
 Convertí cualquier imagen en una **textura pixel art estilo PlayStation 1** directamente en el navegador. Dithering, cuantización de paleta, efecto CRT, grano de película, niveles, presets y exportación — todo en tiempo real, sin subir nada a ningún servidor.
 
 **→ Probalo online gratis: [amarusegovia.github.io/psx-converter](https://amarusegovia.github.io/psx-converter/)**
+
+<!--
+  SCREENSHOT: pegá tu captura en `docs/hero.png` (o `docs/hero.gif` si querés animación).
+  Sugerido: 1280×720, app abierta con una imagen procesada y el slider Compare visible.
+  Después descomentá la línea de abajo:
+-->
+<!-- ![PSX Converter — preview](./docs/hero.png) -->
+
+> [!TIP]
+> **Instalable como PWA** — primera carga la cachea y después funciona offline. No tenés que instalar nada, pero podés "Add to Home Screen" en Chromium para que quede como app nativa.
 
 No hace falta instalar nada. Tu imagen nunca sale de tu navegador.
 
@@ -153,10 +169,10 @@ Requiere Node.js 20+.
 
 ## Stack
 
-React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · Zustand · image-q · Base UI · Framer Motion · JSZip · react-colorful
+React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · Zustand · image-q (Web Worker) · Base UI · Framer Motion · JSZip · react-colorful · Vitest · vite-plugin-pwa
 
 ---
 
 ## Licencia
 
-MIT
+[MIT](./LICENSE) © 2026 Amaru Segovia

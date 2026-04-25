@@ -271,7 +271,7 @@ export function PreviewCanvas() {
           </span>
           <img
             src={sourceImage}
-            alt="Original"
+            alt={t('preview.original')}
             className="max-w-full max-h-[calc(100%-24px)] object-contain drop-shadow-2xl"
             style={{ imageRendering: 'pixelated' }}
           />
@@ -301,8 +301,10 @@ export function PreviewCanvas() {
                       : 'border-border/40 text-muted-foreground/35 hover:text-muted-foreground/70 hover:border-border/70'
                   }`}
                   title={showGrid ? t('preview.hideGrid') : t('preview.showGrid')}
+                  aria-label={showGrid ? t('preview.hideGrid') : t('preview.showGrid')}
+                  aria-pressed={showGrid}
                 >
-                  <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
+                  <svg aria-hidden="true" focusable="false" className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
                     <rect x="0.65" y="0.65" width="4.7" height="4.7" />
                     <rect x="6.65" y="0.65" width="4.7" height="4.7" />
                     <rect x="0.65" y="6.65" width="4.7" height="4.7" />
@@ -318,8 +320,10 @@ export function PreviewCanvas() {
                       : 'border-border/40 text-muted-foreground/35 hover:text-muted-foreground/70 hover:border-border/70'
                   }`}
                   title={showTile ? t('preview.hideTile') : t('preview.showTile')}
+                  aria-label={showTile ? t('preview.hideTile') : t('preview.showTile')}
+                  aria-pressed={showTile}
                 >
-                  <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
+                  <svg aria-hidden="true" focusable="false" className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
                     <rect x="0.65" y="0.65" width="2.7" height="2.7" />
                     <rect x="4.65" y="0.65" width="2.7" height="2.7" />
                     <rect x="8.65" y="0.65" width="2.7" height="2.7" />

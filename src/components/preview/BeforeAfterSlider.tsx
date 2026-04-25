@@ -112,6 +112,18 @@ export function BeforeAfterSlider() {
     <div
       ref={containerRef}
       className="absolute inset-0 cursor-col-resize select-none canvas-checkerboard"
+      role="slider"
+      aria-label={t('view.compare')}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(position)}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); setPosition((p) => Math.max(0, p - (e.shiftKey ? 10 : 2))); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); setPosition((p) => Math.min(100, p + (e.shiftKey ? 10 : 2))); }
+        if (e.key === 'Home')  { e.preventDefault(); setPosition(0); }
+        if (e.key === 'End')   { e.preventDefault(); setPosition(100); }
+      }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -121,7 +133,7 @@ export function BeforeAfterSlider() {
         <img
           ref={sourceRef}
           src={sourceImage}
-          alt="Before"
+          alt={t('preview.original')}
           style={sharedStyle}
           onLoad={handleSourceLoad}
           draggable={false}

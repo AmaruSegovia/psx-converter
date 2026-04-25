@@ -230,8 +230,9 @@ export function AppShell() {
             className="md:hidden w-6 h-6 rounded hover:bg-muted/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
             title={t('sidebar.toggle')}
             aria-label={t('sidebar.toggle')}
+            aria-expanded={mobileSidebarOpen}
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <svg aria-hidden="true" focusable="false" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M3 6h18M3 12h18M3 18h18" />
             </svg>
           </button>
@@ -244,6 +245,7 @@ export function AppShell() {
             onClick={() => setLocale(locale === 'en' ? 'es' : 'en')}
             className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground transition-colors ml-1 uppercase font-mono"
             title={locale === 'en' ? 'Cambiar a Español' : 'Switch to English'}
+            aria-label={locale === 'en' ? 'Cambiar a Español' : 'Switch to English'}
           >
             {locale === 'en' ? 'ES' : 'EN'}
           </button>
@@ -252,6 +254,7 @@ export function AppShell() {
             onClick={() => setShowShortcuts(true)}
             className="text-[10px] w-5 h-5 rounded border border-border text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center"
             title={t('shortcuts.help')}
+            aria-label={t('shortcuts.help')}
           >
             ?
           </button>
@@ -268,8 +271,8 @@ export function AppShell() {
 
           {sourceImage && (
             <Button size="sm" variant="ghost" className="text-[11px] h-7 px-2 gap-1 text-muted-foreground hover:text-destructive"
-              onClick={() => setShowRemoveDialog(true)} title={t('header.removeTitle')}>
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              onClick={() => setShowRemoveDialog(true)} title={t('header.removeTitle')} aria-label={t('header.removeTitle')}>
+              <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
               </svg>
               {t('header.remove')}
@@ -278,8 +281,8 @@ export function AppShell() {
 
           {hasResult && (
             <Button size="sm" variant="ghost" className="text-[11px] h-7 px-2 gap-1 text-muted-foreground hover:text-foreground"
-              onClick={handleCopy} title={t('header.copyTitle')}>
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              onClick={handleCopy} title={t('header.copyTitle')} aria-label={t('header.copyTitle')}>
+              <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
               </svg>
               {t('header.copy')}
@@ -288,8 +291,8 @@ export function AppShell() {
 
           {hasResult && (
             <Button size="sm" variant="ghost" className="text-[11px] h-7 px-2 text-muted-foreground hover:text-foreground"
-              onClick={() => setShowBatchExport(true)} title={t('export.batch')}>
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              onClick={() => setShowBatchExport(true)} title={t('export.batch')} aria-label={t('export.batch')}>
+              <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
               </svg>
             </Button>

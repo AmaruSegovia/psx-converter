@@ -1,9 +1,14 @@
 import { AppShell } from '@/components/layout/AppShell';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { MotionConfig } from 'framer-motion';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { Toaster } from 'sonner';
 
 function App() {
+  const reduce = useReducedMotion();
   return (
-    <>
+    <ErrorBoundary>
+      <MotionConfig reducedMotion={reduce ? 'always' : 'never'}>
       <AppShell />
       <Toaster
         theme="dark"
@@ -21,7 +26,8 @@ function App() {
           },
         }}
       />
-    </>
+      </MotionConfig>
+    </ErrorBoundary>
   );
 }
 

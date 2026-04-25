@@ -81,7 +81,7 @@ export function PresetCard({
             size="sm"
             variant="ghost"
             className="text-[10px] h-6 w-full mt-1.5 text-destructive/70 hover:text-destructive"
-            onClick={(e) => { e.stopPropagation(); deletePreset(id); toast.success(`Deleted "${name}"`); }}
+            onClick={(e) => { e.stopPropagation(); deletePreset(id); toast.success(t('toast.presetDeleted', { name })); }}
           >
             {t('preset.delete')}
           </Button>

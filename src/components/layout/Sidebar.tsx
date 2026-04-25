@@ -47,7 +47,8 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
           onClick={onMobileClose}
         />
       )}
-      <div
+      <aside
+        aria-label="Settings sidebar"
         className={`
           fixed md:static inset-y-0 left-0 z-30 md:z-auto
           w-[85vw] max-w-[420px] md:w-[420px]
@@ -60,11 +61,11 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
         <PresetLoadDialog />
         <PresetSaveDialog />
         <Separator orientation="vertical" className="h-4 mx-1" />
-        <Button size="sm" variant="ghost" className="text-xs h-7 px-2 text-muted-foreground" onClick={undo} title={t('sidebar.undoTitle')}>
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 10h13a4 4 0 010 8H7" /><path d="M3 10l4-4M3 10l4 4" /></svg>
+        <Button size="sm" variant="ghost" className="text-xs h-7 px-2 text-muted-foreground" onClick={undo} title={t('sidebar.undoTitle')} aria-label={t('sidebar.undoTitle')}>
+          <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 10h13a4 4 0 010 8H7" /><path d="M3 10l4-4M3 10l4 4" /></svg>
         </Button>
-        <Button size="sm" variant="ghost" className="text-xs h-7 px-2 text-muted-foreground" onClick={redo} title={t('sidebar.redoTitle')}>
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21 10H8a4 4 0 000 8h10" /><path d="M21 10l-4-4M21 10l-4 4" /></svg>
+        <Button size="sm" variant="ghost" className="text-xs h-7 px-2 text-muted-foreground" onClick={redo} title={t('sidebar.redoTitle')} aria-label={t('sidebar.redoTitle')}>
+          <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21 10H8a4 4 0 000 8h10" /><path d="M21 10l-4-4M21 10l-4 4" /></svg>
         </Button>
         <div className="flex-1" />
         <Button
@@ -165,7 +166,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
           </div>
         </ScrollArea>
       </Tabs>
-      </div>
+      </aside>
     </>
   );
 }

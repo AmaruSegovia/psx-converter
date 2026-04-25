@@ -20,7 +20,7 @@ const BAYER_8X8 = [
   [63, 31, 55, 23, 61, 29, 53, 21],
 ];
 
-function getBayerMatrix(mode: 'bayer-2x2' | 'bayer-4x4' | 'bayer-8x8'): number[][] {
+export function getBayerMatrix(mode: 'bayer-2x2' | 'bayer-4x4' | 'bayer-8x8'): number[][] {
   switch (mode) {
     case 'bayer-2x2': return BAYER_2X2;
     case 'bayer-4x4': return BAYER_4X4;
@@ -28,7 +28,7 @@ function getBayerMatrix(mode: 'bayer-2x2' | 'bayer-4x4' | 'bayer-8x8'): number[]
   }
 }
 
-function applyBayerPreProcess(imageData: ImageData, matrix: number[][]): void {
+export function applyBayerPreProcess(imageData: ImageData, matrix: number[][]): void {
   const data = imageData.data;
   const size = matrix.length;
   const n = size * size;
@@ -62,7 +62,7 @@ function createPaletteFromColors(colors: PaletteColor[]): iq.utils.Palette {
   return palette;
 }
 
-function extractUniqueColors(imageData: ImageData): PaletteColor[] {
+export function extractUniqueColors(imageData: ImageData): PaletteColor[] {
   const seen = new Set<number>();
   const colors: PaletteColor[] = [];
   const data = imageData.data;

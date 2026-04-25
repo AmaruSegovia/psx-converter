@@ -9,6 +9,7 @@ import {
 } from '@/lib/imageProcessing';
 import { publishCanvas } from '@/lib/canvasBus';
 import { toast } from 'sonner';
+import { t } from '@/lib/i18n';
 
 export function useImageProcessor() {
   const settings = useConverterStore((s) => s.settings);
@@ -83,7 +84,7 @@ export function useImageProcessor() {
         setGeneratedPalette(generatedPalette);
       } catch (err) {
         console.error('Processing error:', err);
-        if (fullGenRef.current === gen) toast.error('Processing failed');
+        if (fullGenRef.current === gen) toast.error(t('toast.processingFailed'));
       } finally {
         if (fullGenRef.current === gen) {
           setIsProcessing(false);

@@ -4,8 +4,6 @@ export interface ConverterSettings {
   height: number;
   sizeMode: 'absolute' | 'relative';
   sampleMode: 'nearest' | 'bilinear' | 'bicubic';
-  sampleOffsetX: number;
-  sampleOffsetY: number;
   blurAmount: number;
   sharpenAmount: number;
 
@@ -84,8 +82,6 @@ export const DEFAULT_SETTINGS: ConverterSettings = {
   height: 128,
   sizeMode: 'absolute',
   sampleMode: 'nearest',
-  sampleOffsetX: 0,
-  sampleOffsetY: 0,
   blurAmount: 0,
   sharpenAmount: 0,
   alphaThreshold: 128,

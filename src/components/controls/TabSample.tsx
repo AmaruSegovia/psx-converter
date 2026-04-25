@@ -242,34 +242,6 @@ export function TabSample() {
 
       <div>
         <div className="flex justify-between mb-1">
-          <Label className="text-[11px]">{t('sample.offsetX')}</Label>
-          <span className="text-[11px] text-muted-foreground">{settings.sampleOffsetX.toFixed(2)}</span>
-        </div>
-        <Slider
-          value={[settings.sampleOffsetX]}
-          onValueChange={(val) => updateSettings({ sampleOffsetX: sv(val) })}
-          min={-1}
-          max={1}
-          step={0.01}
-        />
-      </div>
-
-      <div>
-        <div className="flex justify-between mb-1">
-          <Label className="text-[11px]">{t('sample.offsetY')}</Label>
-          <span className="text-[11px] text-muted-foreground">{settings.sampleOffsetY.toFixed(2)}</span>
-        </div>
-        <Slider
-          value={[settings.sampleOffsetY]}
-          onValueChange={(val) => updateSettings({ sampleOffsetY: sv(val) })}
-          min={-1}
-          max={1}
-          step={0.01}
-        />
-      </div>
-
-      <div>
-        <div className="flex justify-between mb-1">
           <Label className="text-[11px]">{t('sample.blur')}</Label>
           <span className="text-[11px] text-muted-foreground">{settings.blurAmount.toFixed(1)}</span>
         </div>

@@ -70,9 +70,9 @@ export function TabPalette() {
         lospecSlug,
         colorCount: colors.length,
       });
-      toast.success(`Imported ${colors.length} colors from Lospec`);
+      toast.success(t('toast.lospecImported', { count: colors.length }));
     }
-  }, [lospecSlug, fetchPalette, updateSettings]);
+  }, [lospecSlug, fetchPalette, updateSettings, t]);
 
   const handleBuiltinSelect = useCallback((slug: string | null) => {
     if (!slug) return;
@@ -84,9 +84,9 @@ export function TabPalette() {
         paletteSource: 'builtin',
         colorCount: colors.length,
       });
-      toast.success(`Loaded "${pal.name}"`);
+      toast.success(t('toast.presetLoaded', { name: pal.name }));
     }
-  }, [updateSettings]);
+  }, [updateSettings, t]);
 
   const handleClearPalette = useCallback(() => {
     updateSettings({
@@ -126,7 +126,7 @@ export function TabPalette() {
         const newPalette = [...settings.palette];
         newPalette[selectedColorIdx] = color;
         updateSettings({ palette: newPalette });
-        toast.success(`Color picked: ${color.hex}`);
+        toast.success(t('toast.colorPicked', { hex: color.hex }));
       } else {
         // Add to palette (promotes from generated if needed)
         updateSettings({
@@ -134,12 +134,12 @@ export function TabPalette() {
           paletteSource: 'custom',
           colorCount: base.length + 1,
         });
-        toast.success(`Added ${color.hex} to palette`);
+        toast.success(t('toast.colorAdded', { hex: color.hex }));
       }
     } catch {
       // User cancelled
     }
-  }, [hasEyeDropper, selectedColorIdx, isGenerated, generatedPalette, settings.palette, updateSettings]);
+  }, [hasEyeDropper, selectedColorIdx, isGenerated, generatedPalette, settings.palette, updateSettings, t]);
 
   const handleFileImport = useCallback(() => {
     const input = document.createElement('input');
@@ -158,15 +158,15 @@ export function TabPalette() {
             paletteSource: 'custom',
             colorCount: colors.length,
           });
-          toast.success(`Imported ${colors.length} colors from file`);
+          toast.success(t('toast.fileImported', { count: colors.length }));
         } else {
-          toast.error('No colors found in file');
+          toast.error(t('toast.noColors'));
         }
       };
       reader.readAsText(file);
     };
     input.click();
-  }, [updateSettings]);
+  }, [updateSettings, t]);
 
   return (
     <div className="space-y-5">
@@ -186,7 +186,7 @@ export function TabPalette() {
               </button>
             )}
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1" role="listbox" aria-label={t('palette.colors')}>
             <AnimatePresence mode="popLayout">
               {displayPalette.map((c: PaletteColor, i: number) => (
                 <motion.button
@@ -198,9 +198,22 @@ export function TabPalette() {
                   transition={{ duration: 0.15 }}
                   className={`w-6 h-6 rounded border-2 ${selectedColorIdx === i ? 'border-white' : 'border-transparent'}`}
                   style={{ backgroundColor: c.hex }}
+                  role="option"
+                  aria-selected={selectedColorIdx === i}
+                  aria-label={c.hex}
                   onClick={() => {
                     if (isGenerated) promoteToCustom(generatedPalette);
                     setSelectedColorIdx(selectedColorIdx === i ? null : i);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Delete' || e.key === 'Backspace') {
+                      if (hasCustomPalette) {
+                        e.preventDefault();
+                        const newPalette = settings.palette.filter((_, idx) => idx !== i);
+                        updateSettings({ palette: newPalette, colorCount: newPalette.length });
+                        setSelectedColorIdx(null);
+                      }
+                    }
                   }}
                   title={c.hex}
                 />
@@ -341,7 +354,8 @@ export function TabPalette() {
               <button
                 onClick={handleDeleteColor}
                 className="w-7 h-7 rounded border border-border flex items-center justify-center text-muted-foreground hover:text-destructive hover:border-destructive/50 transition-colors shrink-0"
-                title="Remove color"
+                title={t('palette.removeColor')}
+                aria-label={t('palette.removeColor')}
               >
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                   <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
