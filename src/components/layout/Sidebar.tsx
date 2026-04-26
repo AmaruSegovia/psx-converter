@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { HoverTooltip } from '@/components/ui/hover-tooltip';
+import { buildShareUrl } from '@/lib/shareLink';
 import { TabSample } from '@/components/controls/TabSample';
 import { TabDither } from '@/components/controls/TabDither';
 // Palette tab carries react-colorful — lazy-load to shrink initial bundle.
@@ -48,6 +50,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
         />
       )}
       <aside
+        data-tour="sidebar"
         aria-label="Settings sidebar"
         className={`
           fixed md:static inset-y-0 left-0 z-30 md:z-auto
@@ -57,25 +60,55 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
         `}
       >
-      <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border">
-        <PresetLoadDialog />
-        <PresetSaveDialog />
-        <Separator orientation="vertical" className="h-4 mx-1" />
-        <Button size="sm" variant="ghost" className="text-xs h-7 px-2 text-muted-foreground" onClick={undo} title={t('sidebar.undoTitle')} aria-label={t('sidebar.undoTitle')}>
-          <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 10h13a4 4 0 010 8H7" /><path d="M3 10l4-4M3 10l4 4" /></svg>
-        </Button>
-        <Button size="sm" variant="ghost" className="text-xs h-7 px-2 text-muted-foreground" onClick={redo} title={t('sidebar.redoTitle')} aria-label={t('sidebar.redoTitle')}>
-          <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21 10H8a4 4 0 000 8h10" /><path d="M21 10l-4-4M21 10l-4 4" /></svg>
-        </Button>
-        <div className="flex-1" />
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-[11px] h-7 px-2 text-muted-foreground hover:text-foreground"
-          onClick={() => setShowResetConfirm(true)}
-        >
-          {t('sidebar.reset')}
-        </Button>
+      <div className="flex flex-col px-3 pt-2 pb-1.5 border-b border-border gap-1">
+        {/* Row 1: presets + share */}
+        <div className="flex items-center gap-1">
+          <PresetLoadDialog />
+          <PresetSaveDialog />
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-7 px-2 gap-1 shrink-0"
+            onClick={async () => {
+              const settings = useConverterStore.getState().settings;
+              const url = buildShareUrl(settings);
+              try {
+                await navigator.clipboard.writeText(url);
+                if (url.length > 2000) toast.warning(t('toast.linkTooLong'));
+                else toast.success(t('toast.linkCopied'));
+              } catch {
+                toast.error(t('toast.copyFailed'));
+              }
+            }}
+            title={t('share.copy')}
+            aria-label={t('share.copy')}
+          >
+            <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.72" />
+              <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+            </svg>
+            {t('share.button')}
+          </Button>
+        </div>
+        {/* Row 2: undo/redo + reset */}
+        <div className="flex items-center gap-0.5">
+          <Button size="sm" variant="ghost" className="text-xs h-7 px-2 text-muted-foreground" onClick={undo} title={t('sidebar.undoTitle')} aria-label={t('sidebar.undoTitle')}>
+            <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 10h13a4 4 0 010 8H7" /><path d="M3 10l4-4M3 10l4 4" /></svg>
+          </Button>
+          <Button size="sm" variant="ghost" className="text-xs h-7 px-2 text-muted-foreground" onClick={redo} title={t('sidebar.redoTitle')} aria-label={t('sidebar.redoTitle')}>
+            <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21 10H8a4 4 0 000 8h10" /><path d="M21 10l-4-4M21 10l-4 4" /></svg>
+          </Button>
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-[11px] h-7 px-2 text-muted-foreground hover:text-foreground shrink-0"
+            onClick={() => setShowResetConfirm(true)}
+          >
+            {t('sidebar.reset')}
+          </Button>
+        </div>
       </div>
 
       <Dialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
@@ -96,15 +129,20 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
             <span className="text-[9px] text-muted-foreground/50 shrink-0">{t('sidebar.history')}</span>
             <div className="flex-1 flex items-center gap-px h-3">
               {Array.from({ length: historyLength }, (_, i) => (
-                <button
+                <HoverTooltip
                   key={i}
-                  onClick={() => navigateHistory(i)}
-                  className={`flex-1 h-1.5 rounded-full transition-colors min-w-[3px] hover:h-2 ${
-                    i === historyIndex ? 'bg-primary' :
-                    i < historyIndex ? 'bg-primary/30' : 'bg-muted-foreground/15'
-                  }`}
-                  title={`${i + 1}/${historyLength} — ${getEntryLabel(i)}`}
-                />
+                  label={`${i + 1}/${historyLength} — ${getEntryLabel(i)}`}
+                  className="flex-1 inline-flex"
+                >
+                  <button
+                    onClick={() => navigateHistory(i)}
+                    aria-label={`${i + 1}/${historyLength} — ${getEntryLabel(i)}`}
+                    className={`w-full h-1.5 rounded-full transition-colors min-w-[3px] hover:h-2 ${
+                      i === historyIndex ? 'bg-primary' :
+                      i < historyIndex ? 'bg-primary/30' : 'bg-muted-foreground/15'
+                    }`}
+                  />
+                </HoverTooltip>
               ))}
             </div>
             <button

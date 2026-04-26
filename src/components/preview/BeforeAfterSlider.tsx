@@ -3,7 +3,13 @@ import { useConverterStore } from '@/store/converterStore';
 import { subscribeCanvas, getResultCanvas, getResultDimensions } from '@/lib/canvasBus';
 import { useTranslation } from '@/hooks/useTranslation';
 
-export function BeforeAfterSlider() {
+interface BeforeAfterSliderProps {
+  bg?: 'checkerboard' | 'black' | 'white' | 'custom' | 'image';
+  bgColor?: string;
+  bgImage?: string | null;
+}
+
+export function BeforeAfterSlider({ bg = 'checkerboard', bgColor = '#1a1525', bgImage = null }: BeforeAfterSliderProps = {}) {
   const { t } = useTranslation();
   const sourceImage = useConverterStore((s) => s.sourceImage);
   const [position, setPosition] = useState(50);
@@ -15,7 +21,10 @@ export function BeforeAfterSlider() {
   const [hasResult, setHasResult] = useState(false);
   const sourceLoadedRef = useRef(false);
 
-  // Compute ONE display size for both images — based on result aspect ratio
+  // Compute ONE display size for both images — based on result aspect ratio.
+  // Source is intentionally squashed to match: the slider compares "exact same
+  // area edited vs not edited" pixel-for-pixel under the divider, which only
+  // works when both images cover the same rectangle.
   const computeDisplaySize = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -108,10 +117,26 @@ export function BeforeAfterSlider() {
   const { w: rw, h: rh } = getResultDimensions();
   const resultLabel = rw && rh ? `${t('preview.converted')} (${rw}x${rh})` : t('preview.converted');
 
+  const useImage = bg === 'image' && !!bgImage;
+  const bgClass = !useImage && bg === 'checkerboard' ? 'canvas-checkerboard' : '';
+  const bgStyle: React.CSSProperties = useImage
+    ? {
+        backgroundImage: `url("${bgImage}")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundColor: '#000',
+      }
+    : bg === 'black' ? { backgroundColor: '#000' }
+    : bg === 'white' ? { backgroundColor: '#fff' }
+    : bg === 'custom' ? { backgroundColor: bgColor }
+    : {};
+
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 cursor-col-resize select-none canvas-checkerboard"
+      className={`absolute inset-0 cursor-col-resize select-none ${bgClass}`}
+      style={bgStyle}
       role="slider"
       aria-label={t('view.compare')}
       aria-valuemin={0}

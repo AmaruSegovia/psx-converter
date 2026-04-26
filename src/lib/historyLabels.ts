@@ -13,7 +13,7 @@ export const KEY_TO_TAB: Record<string, HistoryTab> = {
   gamma: 'colors', tintRed: 'colors', tintGreen: 'colors', tintBlue: 'colors',
   posterize: 'effects',
   crtEnabled: 'effects', crtScanlines: 'effects', crtRgbShift: 'effects', crtVignette: 'effects',
-  grainAmount: 'effects',
+  grainAmount: 'effects', grainSeed: 'effects', grainSeedLocked: 'effects',
   levelsInLow: 'colors', levelsInHigh: 'colors', levelsOutLow: 'colors', levelsOutHigh: 'colors',
 };
 
@@ -29,7 +29,7 @@ export const KEY_LABELS: Record<string, string> = {
   tintRed: 'Red', tintGreen: 'Green', tintBlue: 'Blue',
   posterize: 'Posterize',
   crtEnabled: 'CRT', crtScanlines: 'Scanlines', crtRgbShift: 'RGB shift', crtVignette: 'Vignette',
-  grainAmount: 'Grain',
+  grainAmount: 'Grain', grainSeed: 'Grain seed', grainSeedLocked: 'Grain lock',
   levelsInLow: 'In black', levelsInHigh: 'In white', levelsOutLow: 'Out black', levelsOutHigh: 'Out white',
 };
 
@@ -73,6 +73,8 @@ export function describeChange(key: string, prev: unknown, next: unknown): strin
       return `Transparency → ${String(next)}`;
     case 'crtEnabled':
       return next ? 'CRT on' : 'CRT off';
+    case 'grainSeedLocked':
+      return next ? 'Grain seed locked' : 'Grain seed unlocked';
     case 'useKMeansPlusPlus':
       return next ? 'K-means++ on' : 'K-means++ off';
     case 'colorKeyHex':

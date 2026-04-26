@@ -41,6 +41,8 @@ export interface ConverterSettings {
 
   // Grain
   grainAmount: number;    // 0-1
+  grainSeed: number;      // 0..2^32, used when grainSeedLocked
+  grainSeedLocked: boolean;
 
   // Levels
   levelsInLow: number;    // 0-254
@@ -109,6 +111,8 @@ export const DEFAULT_SETTINGS: ConverterSettings = {
   crtRgbShift: 1,
   crtVignette: 0.3,
   grainAmount: 0,
+  grainSeed: 0,
+  grainSeedLocked: false,
   levelsInLow: 0,
   levelsInHigh: 255,
   levelsOutLow: 0,

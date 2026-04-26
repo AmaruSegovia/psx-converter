@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useConverterStore } from '@/store/converterStore';
 import { useImageProcessor } from '@/hooks/useImageProcessor';
 import { useTranslation } from '@/hooks/useTranslation';
 import { exportPNG, loadImage, processFullPipeline } from '@/lib/imageProcessing';
-import { getResultCanvas, subscribeCanvas, getResultDimensions } from '@/lib/canvasBus';
+import { subscribeCanvas, getResultDimensions } from '@/lib/canvasBus';
 import { onWorkerCrash } from '@/lib/quantizationClient';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,6 +14,9 @@ import { Sidebar } from './Sidebar';
 import { ImageDropzone } from '@/components/preview/ImageDropzone';
 import { PreviewCanvas } from '@/components/preview/PreviewCanvas';
 import { BeforeAfterSlider } from '@/components/preview/BeforeAfterSlider';
+import { FACTORY_PRESETS } from '@/data/factoryPresets';
+import { setPendingHistoryLabel } from '@/hooks/useUndoRedo';
+import type { ConverterSettings } from '@/types';
 
 export function AppShell() {
   useImageProcessor();
@@ -30,7 +33,13 @@ export function AppShell() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [batchExporting, setBatchExporting] = useState(false);
   const [pendingReplaceFile, setPendingReplaceFile] = useState<File | null>(null);
+  const [paletteChoice, setPaletteChoice] = useState<'keep' | 'regen'>('keep');
+  const [restorePrompt, setRestorePrompt] = useState<{ blob: Blob; fileName: string } | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [previewBg, setPreviewBg] = useState<'checkerboard' | 'black' | 'white' | 'custom' | 'image'>('checkerboard');
+  const [previewBgCustom, setPreviewBgCustom] = useState<string>('#1a1525');
+  const [previewBgImage, setPreviewBgImage] = useState<string | null>(null);
+  const bgFileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Smart filename ---
   const getExportFilename = useCallback((w?: number, h?: number) => {
@@ -46,27 +55,48 @@ export function AppShell() {
   const handleRemoveImage = () => {
     useConverterStore.getState().setSourceImage('');
     useConverterStore.getState().setResult(null);
+    import('@/lib/sourceStorage').then((m) => m.clearSource());
     setShowRemoveDialog(false);
     setHasResult(false);
     toast.success(t('toast.imageRemoved'));
   };
 
-  const handleExport = useCallback(() => {
-    const canvas = getResultCanvas();
-    if (!canvas) { toast.error(t('toast.noResult')); return; }
-    exportPNG(canvas, getExportFilename());
-    toast.success(t('toast.exported'));
+  // Export ALWAYS runs the full pipeline so output matches the final preview
+  // exactly. getResultCanvas() may still be holding a Tier 1/2 intermediate
+  // (low-res, no quant or frozen palette) if the user clicks during the 400ms
+  // debounce — using it here would silently ship the wrong image.
+  const handleExport = useCallback(async () => {
+    const source = useConverterStore.getState().sourceImage;
+    if (!source) { toast.error(t('toast.noResult')); return; }
+    const settings = useConverterStore.getState().settings;
+    try {
+      const { resultCanvas } = await processFullPipeline(source, settings);
+      exportPNG(resultCanvas, getExportFilename(resultCanvas.width, resultCanvas.height));
+      toast.success(t('toast.exported'));
+    } catch (err) {
+      console.error('Export failed:', err);
+      toast.error(t('toast.processingFailed'));
+    }
   }, [t, getExportFilename]);
 
   const handleCopy = useCallback(async () => {
-    const canvas = getResultCanvas();
-    if (!canvas) { toast.error(t('toast.noResult')); return; }
+    const source = useConverterStore.getState().sourceImage;
+    if (!source) { toast.error(t('toast.noResult')); return; }
+    const settings = useConverterStore.getState().settings;
     try {
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-      if (!blob) throw new Error();
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      // ClipboardItem accepts a Promise<Blob> — the browser keeps the user
+      // gesture alive while the pipeline runs. Avoids "not allowed" failures
+      // in Safari when await between click and clipboard.write takes too long.
+      const blobPromise = processFullPipeline(source, settings).then(
+        ({ resultCanvas }) =>
+          new Promise<Blob>((res, rej) =>
+            resultCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
+          )
+      );
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
       toast.success(t('toast.copied'));
-    } catch {
+    } catch (err) {
+      console.error('Copy failed:', err);
       toast.error(t('toast.copyFailed'));
     }
   }, [t]);
@@ -81,14 +111,19 @@ export function AppShell() {
     try {
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
+      const { originalWidth: ow, originalHeight: oh } = useConverterStore.getState();
+      const aspect = ow > 0 && oh > 0 ? ow / oh : 1;
       for (const size of batchSizes) {
         try {
-          const batchSettings = { ...settings, width: size, height: size, sizeMode: 'absolute' as const };
+          // Treat `size` as longest side; derive short side from aspect.
+          const w = aspect >= 1 ? size : Math.max(1, Math.round(size * aspect));
+          const h = aspect >= 1 ? Math.max(1, Math.round(size / aspect)) : size;
+          const batchSettings = { ...settings, width: w, height: h, sizeMode: 'absolute' as const };
           const { resultCanvas } = await processFullPipeline(source, batchSettings);
           const blob = await new Promise<Blob>((res, rej) =>
             resultCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
           );
-          zip.file(getExportFilename(size, size), blob);
+          zip.file(getExportFilename(w, h), blob);
         } catch (err) {
           console.error(`Batch export failed for size ${size}:`, err);
           failedSizes.push(size);
@@ -127,6 +162,9 @@ export function AppShell() {
         const base64 = ev.target?.result as string;
         const store = useConverterStore.getState();
         store.setSourceImage(base64, file.name);
+        // Persist the original blob so a refresh can offer to restore it.
+        // Fire-and-forget: failures fall back to no-restore UX.
+        import('@/lib/sourceStorage').then((m) => m.saveSource(file, file.name));
         const img = await loadImage(base64);
         store.setOriginalDimensions(img.naturalWidth, img.naturalHeight);
         const s = store.settings;
@@ -157,9 +195,19 @@ export function AppShell() {
   }, []);
 
   const handleConfirmReplace = useCallback(() => {
-    if (pendingReplaceFile) loadDroppedFile(pendingReplaceFile);
+    if (pendingReplaceFile) {
+      loadDroppedFile(pendingReplaceFile);
+      if (paletteChoice === 'regen') {
+        useConverterStore.getState().updateSettings({
+          palette: [],
+          paletteSource: 'generated',
+          lospecSlug: '',
+        });
+      }
+    }
     setPendingReplaceFile(null);
-  }, [pendingReplaceFile, loadDroppedFile]);
+    setPaletteChoice('keep');
+  }, [pendingReplaceFile, loadDroppedFile, paletteChoice]);
 
   // --- Effects ---
   useEffect(() => {
@@ -182,6 +230,94 @@ export function AppShell() {
     if (!sourceImage) setHasResult(false);
   }, [sourceImage]);
 
+  // On first mount: if no source in store but IDB has one, offer restore.
+  useEffect(() => {
+    if (sourceImage) return;
+    let cancelled = false;
+    import('@/lib/sourceStorage').then((m) => m.loadSource()).then((saved) => {
+      if (!cancelled && saved) setRestorePrompt({ blob: saved.blob, fileName: saved.fileName });
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleRestoreAccept = useCallback(() => {
+    if (!restorePrompt) return;
+    const file = new File([restorePrompt.blob], restorePrompt.fileName, { type: restorePrompt.blob.type });
+    setRestorePrompt(null);
+    loadDroppedFile(file);
+  }, [restorePrompt, loadDroppedFile]);
+
+  const handleRestoreDiscard = useCallback(() => {
+    setRestorePrompt(null);
+    import('@/lib/sourceStorage').then((m) => m.clearSource());
+  }, []);
+
+  // Live-sync URL hash with current settings (debounced) so the address bar is
+  // always copyable. Skipped while no source loaded (link is meaningless).
+  const settingsForHash = useConverterStore((s) => s.settings);
+  useEffect(() => {
+    if (!sourceImage) return;
+    const timer = setTimeout(() => {
+      import('@/lib/shareLink').then((m) => m.writeHashToUrl(settingsForHash));
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [settingsForHash, sourceImage]);
+
+  // --- Preview BG image: revoke object URL when replaced or unmounted ---
+  useEffect(() => {
+    return () => {
+      if (previewBgImage) URL.revokeObjectURL(previewBgImage);
+    };
+  }, [previewBgImage]);
+
+  const handleBgImagePick = useCallback(() => {
+    bgFileInputRef.current?.click();
+  }, []);
+
+  const handleBgImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-uploading the same file later
+    if (!file || !file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file);
+    const probe = new Image();
+    probe.onerror = () => {
+      URL.revokeObjectURL(url);
+      toast.error(t('toast.bgImageError'));
+    };
+    probe.src = url;
+    if (previewBgImage) URL.revokeObjectURL(previewBgImage);
+    setPreviewBgImage(url);
+    setPreviewBg('image');
+  }, [previewBgImage, t]);
+
+  const handleBgImageClear = useCallback(() => {
+    if (previewBgImage) URL.revokeObjectURL(previewBgImage);
+    setPreviewBgImage(null);
+    setPreviewBg('checkerboard');
+  }, [previewBgImage]);
+
+  // Paste image from clipboard (Ctrl+V)
+  useEffect(() => {
+    const handler = (e: ClipboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (!file) return;
+          e.preventDefault();
+          if (sourceImage) setPendingReplaceFile(file);
+          else loadDroppedFile(file);
+          return;
+        }
+      }
+    };
+    window.addEventListener('paste', handler);
+    return () => window.removeEventListener('paste', handler);
+  }, [sourceImage, loadDroppedFile]);
+
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (sourceImage) e.preventDefault();
@@ -190,7 +326,7 @@ export function AppShell() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [sourceImage]);
 
-  // Keyboard shortcuts: Ctrl+C (copy), Ctrl+S (export), ? (shortcuts)
+  // Keyboard shortcuts: Ctrl+C (copy), Ctrl+S (export), Ctrl+1..9 (presets), ? (help)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Don't intercept when typing in inputs
@@ -204,6 +340,24 @@ export function AppShell() {
         e.preventDefault();
         handleExport();
       }
+      // Ctrl+1..Ctrl+9 → load factory preset N
+      if ((e.ctrlKey || e.metaKey) && /^[1-9]$/.test(e.key)) {
+        const idx = parseInt(e.key, 10) - 1;
+        const preset = FACTORY_PRESETS[idx];
+        if (!preset) return;
+        e.preventDefault();
+        const store = useConverterStore.getState();
+        const ow = store.originalWidth;
+        const oh = store.originalHeight;
+        const maxDim = Math.max(preset.settings.width, preset.settings.height);
+        const aspect = ow > 0 && oh > 0 ? ow / oh : 1;
+        const w = aspect >= 1 ? maxDim : Math.max(1, Math.round(maxDim * aspect));
+        const h = aspect >= 1 ? Math.max(1, Math.round(maxDim / aspect)) : maxDim;
+        setPendingHistoryLabel(`Preset: ${preset.name}`);
+        const next: ConverterSettings = { ...preset.settings, width: w, height: h, sizeMode: 'absolute' };
+        store.loadSettings(next);
+        toast.success(t('toast.presetLoaded', { name: preset.name }));
+      }
       if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
         e.preventDefault();
         setShowShortcuts(s => !s);
@@ -211,7 +365,7 @@ export function AppShell() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleCopy, handleExport, hasResult]);
+  }, [handleCopy, handleExport, hasResult, t]);
 
   // --- Batch size toggle ---
   const toggleBatchSize = (size: number) => {
@@ -226,6 +380,7 @@ export function AppShell() {
       <header className="flex items-center justify-between px-4 h-11 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-2">
           <button
+            data-tour="sidebar-toggle"
             onClick={() => setMobileSidebarOpen((v) => !v)}
             className="md:hidden w-6 h-6 rounded hover:bg-muted/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
             title={t('sidebar.toggle')}
@@ -251,6 +406,7 @@ export function AppShell() {
           </button>
 
           <button
+            data-tour="shortcuts"
             onClick={() => setShowShortcuts(true)}
             className="text-[10px] w-5 h-5 rounded border border-border text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center"
             title={t('shortcuts.help')}
@@ -298,7 +454,7 @@ export function AppShell() {
             </Button>
           )}
 
-          <Button size="sm" className="text-[11px] h-7 px-3 bg-primary hover:bg-primary/90"
+          <Button size="sm" data-tour="export" className="text-[11px] h-7 px-3 bg-primary hover:bg-primary/90"
             disabled={!hasResult || isProcessing} onClick={handleExport}>
             {t('header.export')}
           </Button>
@@ -306,15 +462,49 @@ export function AppShell() {
       </header>
 
       {/* Dialogs */}
-      <Dialog open={!!pendingReplaceFile} onOpenChange={(o) => { if (!o) setPendingReplaceFile(null); }}>
+      <Dialog open={!!pendingReplaceFile} onOpenChange={(o) => { if (!o) { setPendingReplaceFile(null); setPaletteChoice('keep'); } }}>
         <DialogContent className="max-w-xs">
           <DialogHeader><DialogTitle>{t('replace.title')}</DialogTitle></DialogHeader>
           <p className="text-[12px] text-muted-foreground">{t('replace.description')}</p>
           {pendingReplaceFile && (
             <p className="text-[11px] text-muted-foreground/70 truncate font-mono">{pendingReplaceFile.name}</p>
           )}
+          {(() => {
+            const s = useConverterStore.getState().settings;
+            const hasCustomPalette = s.paletteSource !== 'generated' || s.palette.length > 0;
+            if (!hasCustomPalette) return null;
+            return (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <p className="text-[11px] text-muted-foreground">{t('replace.paletteQuestion')}</p>
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex items-center gap-2 text-[11px] cursor-pointer">
+                    <input
+                      type="radio"
+                      name="palette-choice"
+                      value="keep"
+                      checked={paletteChoice === 'keep'}
+                      onChange={() => setPaletteChoice('keep')}
+                      className="accent-primary"
+                    />
+                    {t('replace.paletteKeep')}
+                  </label>
+                  <label className="flex items-center gap-2 text-[11px] cursor-pointer">
+                    <input
+                      type="radio"
+                      name="palette-choice"
+                      value="regen"
+                      checked={paletteChoice === 'regen'}
+                      onChange={() => setPaletteChoice('regen')}
+                      className="accent-primary"
+                    />
+                    {t('replace.paletteRegen')}
+                  </label>
+                </div>
+              </div>
+            );
+          })()}
           <div className="flex gap-2 justify-end">
-            <Button size="sm" variant="outline" className="text-[11px]" onClick={() => setPendingReplaceFile(null)}>{t('replace.cancel')}</Button>
+            <Button size="sm" variant="outline" className="text-[11px]" onClick={() => { setPendingReplaceFile(null); setPaletteChoice('keep'); }}>{t('replace.cancel')}</Button>
             <Button size="sm" className="text-[11px] bg-primary hover:bg-primary/90" onClick={handleConfirmReplace}>{t('replace.confirm')}</Button>
           </div>
         </DialogContent>
@@ -339,7 +529,9 @@ export function AppShell() {
               ['Ctrl + Z', t('shortcuts.undo')],
               ['Ctrl + Y', t('shortcuts.redo')],
               ['Ctrl + C', t('shortcuts.copy')],
+              ['Ctrl + V', t('shortcuts.paste')],
               ['Ctrl + S', t('shortcuts.export')],
+              ['Ctrl + 1…9', t('shortcuts.preset')],
               ['?', t('shortcuts.help')],
             ].map(([key, action]) => (
               <div key={key} className="flex justify-between">
@@ -347,6 +539,18 @@ export function AppShell() {
                 <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">{key}</kbd>
               </div>
             ))}
+          </div>
+          <div className="pt-2 border-t border-border">
+            <Button
+              size="sm" variant="outline" className="text-[11px] w-full"
+              onClick={() => {
+                setShowShortcuts(false);
+                try { localStorage.removeItem('psx-tour-done'); } catch { /* ignore */ }
+                window.dispatchEvent(new Event('psx:replay-tour'));
+              }}
+            >
+              {t('tour.replay')}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -383,19 +587,34 @@ export function AppShell() {
           <div className="flex-1 relative overflow-hidden">
             <AnimatePresence mode="wait">
               {!sourceImage ? (
-                <motion.div key="dropzone" className="absolute inset-0"
+                <motion.div key="dropzone" className="absolute inset-0" data-tour="dropzone"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
                   <ImageDropzone />
+                  {restorePrompt && (
+                    <motion.div
+                      initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                      className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-card/95 backdrop-blur-md px-3 py-2 rounded-full shadow-lg ring-1 ring-border"
+                    >
+                      <span className="text-[11px] text-foreground/80">{t('restore.title')}</span>
+                      <span className="text-[10px] text-muted-foreground/70 font-mono truncate max-w-[140px]">{restorePrompt.fileName}</span>
+                      <Button size="sm" className="text-[11px] h-6 px-2 bg-primary hover:bg-primary/90" onClick={handleRestoreAccept}>
+                        {t('restore.continue')}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-[11px] h-6 px-2 text-muted-foreground hover:text-destructive" onClick={handleRestoreDiscard}>
+                        {t('restore.discard')}
+                      </Button>
+                    </motion.div>
+                  )}
                 </motion.div>
               ) : viewMode === 'slider' && hasResult ? (
                 <motion.div key="slider" className="absolute inset-0"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-                  <BeforeAfterSlider />
+                  <BeforeAfterSlider bg={previewBg} bgColor={previewBgCustom} bgImage={previewBgImage} />
                 </motion.div>
               ) : (
                 <motion.div key="sidebyside" className="absolute inset-0"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-                  <PreviewCanvas />
+                  <PreviewCanvas bg={previewBg} bgColor={previewBgCustom} bgImage={previewBgImage} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -436,8 +655,89 @@ export function AppShell() {
                   </div>
                 )}
               </div>
-              <div className="text-[11px] text-muted-foreground/50 font-mono">
-                {useConverterStore.getState().originalWidth} x {useConverterStore.getState().originalHeight}px
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1" role="group" aria-label={t('preview.bgLabel')}>
+                  <span className="text-[10px] text-muted-foreground/60 mr-1">{t('preview.bgLabel')}</span>
+                  {(['checkerboard', 'black', 'white', 'custom'] as const).map((b) => (
+                    <button
+                      key={b}
+                      onClick={() => setPreviewBg(b)}
+                      title={t(`preview.bg.${b}` as const)}
+                      aria-label={t(`preview.bg.${b}` as const)}
+                      aria-pressed={previewBg === b}
+                      className={`w-5 h-5 rounded border transition-colors ${
+                        previewBg === b ? 'border-primary ring-1 ring-primary/50' : 'border-border/50 hover:border-border'
+                      }`}
+                      style={
+                        b === 'checkerboard'
+                          ? { backgroundImage: 'repeating-conic-gradient(#444 0% 25%, #888 0% 50%)', backgroundSize: '6px 6px' }
+                          : b === 'black' ? { backgroundColor: '#000' }
+                          : b === 'white' ? { backgroundColor: '#fff' }
+                          : { backgroundColor: previewBgCustom }
+                      }
+                    />
+                  ))}
+                  {previewBg === 'custom' && (
+                    <input
+                      type="color"
+                      value={previewBgCustom}
+                      onChange={(e) => setPreviewBgCustom(e.target.value)}
+                      className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent"
+                      aria-label={t('preview.bg.custom')}
+                    />
+                  )}
+                  <button
+                    onClick={previewBgImage ? () => setPreviewBg('image') : handleBgImagePick}
+                    title={t('preview.bg.image')}
+                    aria-label={t('preview.bg.image')}
+                    aria-pressed={previewBg === 'image'}
+                    className={`w-5 h-5 rounded border transition-colors flex items-center justify-center text-muted-foreground ${
+                      previewBg === 'image' ? 'border-primary ring-1 ring-primary/50' : 'border-border/50 hover:border-border'
+                    }`}
+                    style={previewBgImage && previewBg === 'image'
+                      ? { backgroundImage: `url("${previewBgImage}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                      : undefined}
+                  >
+                    {!(previewBgImage && previewBg === 'image') && (
+                      <svg aria-hidden="true" focusable="false" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="9" cy="9" r="1.5" />
+                        <path d="M3 17l5-5 4 4 3-3 6 6" />
+                      </svg>
+                    )}
+                  </button>
+                  {previewBg === 'image' && previewBgImage && (
+                    <>
+                      <button
+                        onClick={handleBgImagePick}
+                        title={t('preview.bg.imageUpload')}
+                        aria-label={t('preview.bg.imageUpload')}
+                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1"
+                      >
+                        ↻
+                      </button>
+                      <button
+                        onClick={handleBgImageClear}
+                        title={t('preview.bg.imageClear')}
+                        aria-label={t('preview.bg.imageClear')}
+                        className="text-[10px] text-muted-foreground hover:text-destructive transition-colors px-1"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  )}
+                  <input
+                    ref={bgFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBgImageChange}
+                    className="sr-only"
+                    aria-hidden="true"
+                  />
+                </div>
+                <div className="text-[11px] text-muted-foreground/50 font-mono">
+                  {useConverterStore.getState().originalWidth} x {useConverterStore.getState().originalHeight}px
+                </div>
               </div>
             </motion.div>
           )}

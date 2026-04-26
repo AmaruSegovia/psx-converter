@@ -33,6 +33,8 @@ export function TabPalette() {
 
   const isGenerated = settings.paletteSource === 'generated';
   const hasCustomPalette = settings.palette.length > 0;
+  const [dragFromIdx, setDragFromIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   // What to display in swatches: generated colors (read from store) or custom palette
   const displayPalette = isGenerated ? generatedPalette : settings.palette;
   const hasDisplayPalette = displayPalette.length > 0;
@@ -196,11 +198,54 @@ export function TabPalette() {
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0, opacity: 0 }}
                   transition={{ duration: 0.15 }}
-                  className={`w-6 h-6 rounded border-2 ${selectedColorIdx === i ? 'border-white' : 'border-transparent'}`}
+                  className={`w-6 h-6 rounded border-2 transition-shadow ${
+                    selectedColorIdx === i ? 'border-white' : 'border-transparent'
+                  } ${dragOverIdx === i && dragFromIdx !== i ? 'ring-2 ring-primary' : ''} ${
+                    dragFromIdx === i ? 'opacity-40' : ''
+                  }`}
                   style={{ backgroundColor: c.hex }}
                   role="option"
                   aria-selected={selectedColorIdx === i}
                   aria-label={c.hex}
+                  draggable={hasCustomPalette}
+                  // Framer's motion.button shadows native DnD handler types.
+                  // Cast through unknown so React still wires the native event listeners.
+                  {...({
+                    onDragStart: (e: React.DragEvent<HTMLButtonElement>) => {
+                      if (!hasCustomPalette) return;
+                      setDragFromIdx(i);
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', String(i));
+                    },
+                    onDragOver: (e: React.DragEvent<HTMLButtonElement>) => {
+                      if (!hasCustomPalette || dragFromIdx === null) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (dragOverIdx !== i) setDragOverIdx(i);
+                    },
+                    onDragLeave: () => {
+                      if (dragOverIdx === i) setDragOverIdx(null);
+                    },
+                    onDrop: (e: React.DragEvent<HTMLButtonElement>) => {
+                      if (!hasCustomPalette || dragFromIdx === null) return;
+                      e.preventDefault();
+                      const from = dragFromIdx;
+                      const to = i;
+                      if (from !== to) {
+                        const next = [...settings.palette];
+                        const [moved] = next.splice(from, 1);
+                        next.splice(to, 0, moved);
+                        updateSettings({ palette: next });
+                        setSelectedColorIdx(to);
+                      }
+                      setDragFromIdx(null);
+                      setDragOverIdx(null);
+                    },
+                    onDragEnd: () => {
+                      setDragFromIdx(null);
+                      setDragOverIdx(null);
+                    },
+                  } as unknown as Record<string, unknown>)}
                   onClick={() => {
                     if (isGenerated) promoteToCustom(generatedPalette);
                     setSelectedColorIdx(selectedColorIdx === i ? null : i);

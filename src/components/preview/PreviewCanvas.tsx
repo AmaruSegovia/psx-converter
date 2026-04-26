@@ -6,7 +6,15 @@ import { useTranslation } from '@/hooks/useTranslation';
 const GRID_ZOOM_THRESHOLD = 1.5;
 const TILE_COUNT = 3; // 3×3 repeat
 
-export function PreviewCanvas() {
+export type PreviewBg = 'checkerboard' | 'black' | 'white' | 'custom' | 'image';
+
+interface PreviewCanvasProps {
+  bg?: PreviewBg;
+  bgColor?: string;
+  bgImage?: string | null;
+}
+
+export function PreviewCanvas({ bg = 'checkerboard', bgColor = '#1a1525', bgImage = null }: PreviewCanvasProps = {}) {
   const { t } = useTranslation();
   const sourceImage = useConverterStore((s) => s.sourceImage);
   const isProcessing = useConverterStore((s) => s.isProcessing);
@@ -261,8 +269,23 @@ export function PreviewCanvas() {
   const canPan = zoom * displayW > (containerRef.current?.clientWidth ?? Infinity) ||
                  zoom * displayH > (containerRef.current?.clientHeight ?? Infinity);
 
+  const useImage = bg === 'image' && !!bgImage;
+  const bgClass = !useImage && bg === 'checkerboard' ? 'canvas-checkerboard' : '';
+  const bgStyle: React.CSSProperties = useImage
+    ? {
+        backgroundImage: `url("${bgImage}")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundColor: '#000',
+      }
+    : bg === 'black' ? { backgroundColor: '#000' }
+    : bg === 'white' ? { backgroundColor: '#fff' }
+    : bg === 'custom' ? { backgroundColor: bgColor }
+    : {};
+
   return (
-    <div className="absolute inset-0 flex items-center justify-center canvas-checkerboard">
+    <div className={`absolute inset-0 flex items-center justify-center ${bgClass}`} style={bgStyle}>
       <div className="flex gap-6 items-center justify-center p-6 w-full h-full">
         {/* Source */}
         <div className="flex flex-col items-center gap-2 flex-1 h-full justify-center overflow-hidden">

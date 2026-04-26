@@ -23,6 +23,9 @@ export const translations = {
     'replace.description': 'Undo history will be cleared. Your settings are kept.',
     'replace.cancel': 'Cancel',
     'replace.confirm': 'Replace',
+    'replace.paletteQuestion': 'A custom palette is active. What should happen with it?',
+    'replace.paletteKeep': 'Keep current palette',
+    'replace.paletteRegen': 'Regenerate from new image',
 
     // Dropzone loading
     'dropzone.loading': 'Loading image...',
@@ -32,6 +35,14 @@ export const translations = {
     // Bottom bar
     'view.compare': 'Compare',
     'view.sideBySide': 'Side by Side',
+    'preview.bgLabel': 'Background',
+    'preview.bg.checkerboard': 'Checkerboard',
+    'preview.bg.black': 'Black',
+    'preview.bg.white': 'White',
+    'preview.bg.custom': 'Custom color',
+    'preview.bg.image': 'Image as background',
+    'preview.bg.imageUpload': 'Replace background image',
+    'preview.bg.imageClear': 'Remove background image',
 
     // Sidebar
     'sidebar.reset': 'Reset',
@@ -54,6 +65,9 @@ export const translations = {
     'sample.nearest': 'Nearest Neighbor',
     'sample.bilinear': 'Bilinear',
     'sample.bicubic': 'Bicubic',
+    'sample.targetPreset': 'Target size',
+    'sample.targetPresetTip': 'Common power-of-two sizes for game textures (PSX 64-256, GameBoy 160). The longest side gets clamped to the chosen value, and the other side keeps the source aspect ratio.',
+    'sample.targetCustom': 'Custom',
     'sample.blur': 'Blur Amount',
     'sample.sharpen': 'Sharpen Amount',
     'sample.lockAspect': 'Lock aspect ratio',
@@ -159,7 +173,9 @@ export const translations = {
     'shortcuts.undo': 'Undo',
     'shortcuts.redo': 'Redo',
     'shortcuts.copy': 'Copy to clipboard',
+    'shortcuts.paste': 'Paste image',
     'shortcuts.export': 'Export PNG',
+    'shortcuts.preset': 'Load factory preset 1…9',
     'shortcuts.help': 'Show shortcuts',
 
     // History
@@ -208,6 +224,32 @@ export const translations = {
     'palette.exportFormat': 'Choose a format:',
     'palette.generatedColors': 'Generated Colors',
     'toast.paletteExported': 'Palette exported',
+    'toast.bgImageError': 'Could not load background image',
+    'toast.linkCopied': 'Share link copied to clipboard',
+    'toast.linkLoaded': 'Settings loaded from link',
+    'toast.linkTooLong': 'Link copied — but it is unusually long. Consider sharing the JSON preset instead.',
+    'share.copy': 'Copy share link',
+    'share.button': 'Share',
+    'restore.title': 'Continue with your last image?',
+    'restore.continue': 'Continue',
+    'restore.discard': 'Discard',
+    'tour.welcomeTitle': 'Welcome to PSX Converter',
+    'tour.welcomeBody': 'Convert any image into PlayStation 1-style pixel art textures. A 5-step tour to get you started — should take a minute.',
+    'tour.loadTitle': 'Load an image',
+    'tour.loadBody': 'Drag & drop, click to browse, paste with Ctrl+V, or pick an example from the gallery below.',
+    'tour.loadBodyLoaded': 'Image already loaded. You can replace it any time by dropping another image onto the preview.',
+    'tour.settingsTitle': 'Tweak the look',
+    'tour.settingsBody': 'Five tabs: Resize, Dither, Palette, Colors, Effects. Every change previews in real time.',
+    'tour.exportTitle': 'Export your texture',
+    'tour.exportBody': 'PNG with smart filename. Ctrl+S works too. Batch export gives you a ZIP at multiple sizes.',
+    'tour.shortcutsTitle': 'Keyboard shortcuts',
+    'tour.shortcutsBody': 'This `?` button opens the full list. Highlights: Ctrl+Z undo, Ctrl+1…9 load preset, Ctrl+V paste image.',
+    'tour.next': 'Next',
+    'tour.back': 'Back',
+    'tour.skip': 'Skip',
+    'tour.done': 'Got it',
+    'tour.dontShow': "Don't show again",
+    'tour.replay': 'Replay onboarding tour',
 
     // Examples gallery
     'dropzone.examples': 'Or try an example',
@@ -222,6 +264,11 @@ export const translations = {
     // Film Grain
     'effects.grain': 'Film Grain',
     'effects.grainTip': 'Adds analog noise to the image. Simulates film or CRT sensor grain.',
+    'effects.grainSeedLock': 'Lock grain seed for reproducible exports',
+    'effects.grainSeedUnlock': 'Unlock grain seed (random each render)',
+    'effects.grainSeedLocked': 'Locked',
+    'effects.grainSeedRandom': 'Random',
+    'effects.grainSeedRegenerate': 'Click to generate a new seed',
 
     // Levels
     'colors.levels': 'Levels',
@@ -252,6 +299,9 @@ export const translations = {
     'replace.description': 'Se limpiará el historial de deshacer. Tus ajustes se mantienen.',
     'replace.cancel': 'Cancelar',
     'replace.confirm': 'Reemplazar',
+    'replace.paletteQuestion': 'Hay una paleta personalizada activa. ¿Qué hacemos con ella?',
+    'replace.paletteKeep': 'Mantener paleta actual',
+    'replace.paletteRegen': 'Regenerar desde la nueva imagen',
 
     // Dropzone loading
     'dropzone.loading': 'Cargando imagen...',
@@ -260,6 +310,14 @@ export const translations = {
 
     'view.compare': 'Comparar',
     'view.sideBySide': 'Lado a Lado',
+    'preview.bgLabel': 'Fondo',
+    'preview.bg.checkerboard': 'Ajedrez',
+    'preview.bg.black': 'Negro',
+    'preview.bg.white': 'Blanco',
+    'preview.bg.custom': 'Color personalizado',
+    'preview.bg.image': 'Imagen como fondo',
+    'preview.bg.imageUpload': 'Reemplazar imagen de fondo',
+    'preview.bg.imageClear': 'Quitar imagen de fondo',
 
     'sidebar.reset': 'Reiniciar',
     'sidebar.undoTitle': 'Deshacer (Ctrl+Z)',
@@ -279,6 +337,9 @@ export const translations = {
     'sample.nearest': 'Nearest',
     'sample.bilinear': 'Bilinear',
     'sample.bicubic': 'Bicubic',
+    'sample.targetPreset': 'Tamaño objetivo',
+    'sample.targetPresetTip': 'Tamaños potencia-de-dos típicos para texturas de juego (PSX 64-256, GameBoy 160). El lado más largo se ajusta al elegido y el otro respeta el aspect del source.',
+    'sample.targetCustom': 'Personalizado',
     'sample.blur': 'Desenfoque',
     'sample.sharpen': 'Nitidez',
     'sample.lockAspect': 'Bloquear proporción',
@@ -374,7 +435,9 @@ export const translations = {
     'shortcuts.undo': 'Deshacer',
     'shortcuts.redo': 'Rehacer',
     'shortcuts.copy': 'Copiar al portapapeles',
+    'shortcuts.paste': 'Pegar imagen',
     'shortcuts.export': 'Exportar PNG',
+    'shortcuts.preset': 'Cargar preset factory 1…9',
     'shortcuts.help': 'Mostrar atajos',
 
     'sidebar.history': 'Historial',
@@ -416,6 +479,32 @@ export const translations = {
     'palette.exportFormat': 'Elegir formato:',
     'palette.generatedColors': 'Colores Generados',
     'toast.paletteExported': 'Paleta exportada',
+    'toast.bgImageError': 'No se pudo cargar la imagen de fondo',
+    'toast.linkCopied': 'Link copiado al portapapeles',
+    'toast.linkLoaded': 'Ajustes cargados desde link',
+    'toast.linkTooLong': 'Link copiado — pero quedó muy largo. Considerá compartir el preset JSON.',
+    'share.copy': 'Copiar link para compartir',
+    'share.button': 'Compartir',
+    'restore.title': '¿Continuar con tu última imagen?',
+    'restore.continue': 'Continuar',
+    'restore.discard': 'Descartar',
+    'tour.welcomeTitle': 'Bienvenido a PSX Converter',
+    'tour.welcomeBody': 'Convertí cualquier imagen en una textura pixel art estilo PlayStation 1. Tour de 5 pasos — un minuto y listo.',
+    'tour.loadTitle': 'Cargá una imagen',
+    'tour.loadBody': 'Arrastrá, hacé click, pegá con Ctrl+V, o probá un ejemplo de la galería de abajo.',
+    'tour.loadBodyLoaded': 'Ya tenés una imagen cargada. Podés reemplazarla arrastrando otra encima del preview.',
+    'tour.settingsTitle': 'Ajustá el look',
+    'tour.settingsBody': 'Cinco pestañas: Resize, Dither, Paleta, Colores, Efectos. Cada cambio se previsualiza en tiempo real.',
+    'tour.exportTitle': 'Exportá tu textura',
+    'tour.exportBody': 'PNG con nombre inteligente. Ctrl+S también funciona. El batch export te da un ZIP con varios tamaños.',
+    'tour.shortcutsTitle': 'Atajos de teclado',
+    'tour.shortcutsBody': 'Este botón `?` abre la lista completa. Destacados: Ctrl+Z deshacer, Ctrl+1…9 cargar preset, Ctrl+V pegar.',
+    'tour.next': 'Siguiente',
+    'tour.back': 'Atrás',
+    'tour.skip': 'Saltar',
+    'tour.done': 'Listo',
+    'tour.dontShow': 'No mostrar más',
+    'tour.replay': 'Repetir tour de bienvenida',
 
     'dropzone.examples': 'O probá un ejemplo',
     'dropzone.exampleLoaded': 'Ejemplo cargado',
@@ -428,6 +517,11 @@ export const translations = {
     // Film Grain
     'effects.grain': 'Grano de Película',
     'effects.grainTip': 'Agrega ruido analógico a la imagen. Simula grano de película o sensor CRT.',
+    'effects.grainSeedLock': 'Bloquear semilla de grano (export reproducible)',
+    'effects.grainSeedUnlock': 'Desbloquear semilla (aleatoria cada render)',
+    'effects.grainSeedLocked': 'Bloqueada',
+    'effects.grainSeedRandom': 'Aleatoria',
+    'effects.grainSeedRegenerate': 'Click para generar nueva semilla',
 
     // Levels
     'colors.levels': 'Niveles',
@@ -441,7 +535,19 @@ export const translations = {
 export type Locale = keyof typeof translations;
 export type TranslationKey = keyof typeof translations.en;
 
-let _locale: Locale = (localStorage.getItem('psx-locale') as Locale) || 'en';
+export function detectInitialLocale(): Locale {
+  try {
+    const saved = localStorage.getItem('psx-locale');
+    if (saved === 'en' || saved === 'es') return saved;
+  } catch { /* localStorage may throw in privacy modes */ }
+  if (typeof navigator !== 'undefined') {
+    const lang = navigator.language?.toLowerCase() ?? '';
+    if (lang.startsWith('es')) return 'es';
+  }
+  return 'en';
+}
+
+let _locale: Locale = detectInitialLocale();
 let _listeners: Array<() => void> = [];
 
 export function getLocale(): Locale {

@@ -146,6 +146,22 @@ describe('applyGrain', () => {
     expect(img.data[0]).toBe(100);
     expect(img.data[3]).toBe(0);
   });
+
+  it('with seed=N produces same output across runs (reproducible)', () => {
+    const a = makeImageData(Array.from({ length: 16 }, () => [100, 100, 100, 255]));
+    const b = makeImageData(Array.from({ length: 16 }, () => [100, 100, 100, 255]));
+    applyGrain(a, 0.5, 42);
+    applyGrain(b, 0.5, 42);
+    expect(Array.from(a.data)).toEqual(Array.from(b.data));
+  });
+
+  it('with different seeds produces different outputs', () => {
+    const a = makeImageData(Array.from({ length: 16 }, () => [100, 100, 100, 255]));
+    const b = makeImageData(Array.from({ length: 16 }, () => [100, 100, 100, 255]));
+    applyGrain(a, 0.5, 42);
+    applyGrain(b, 0.5, 99);
+    expect(Array.from(a.data)).not.toEqual(Array.from(b.data));
+  });
 });
 
 describe('applyTransparency', () => {

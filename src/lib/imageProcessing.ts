@@ -51,13 +51,26 @@ export function applyLevels(
   }
 }
 
-export function applyGrain(imageData: ImageData, amount: number): void {
+// Tiny seeded PRNG. Same seed → same sequence → reproducible export.
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function applyGrain(imageData: ImageData, amount: number, seed?: number): void {
   if (amount <= 0) return;
   const data = imageData.data;
   const strength = amount * 255 * 0.25;
+  const rng = seed != null ? mulberry32(seed) : Math.random;
   for (let i = 0; i < data.length; i += 4) {
     if (data[i + 3] === 0) continue;
-    const noise = (Math.random() - 0.5) * 2 * strength;
+    const noise = (rng() - 0.5) * 2 * strength;
     data[i]     = Math.max(0, Math.min(255, data[i]     + noise));
     data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
     data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
@@ -259,10 +272,48 @@ export function exportPNG(canvas: HTMLCanvasElement, filename = 'psx-texture.png
   }, 'image/png');
 }
 
+// --- Canonical pipeline order ---
+// Both processFastPreview and processFullPipeline (and processFastQuantPreview)
+// MUST execute these stages in this exact order so the preview is WYSIWYG with
+// the export. Drift between paths is a visual bug.
+//
+//   1. transparency / levels / color  (per-pixel ops on source)
+//   2. blur                           (Canvas filter)
+//   3. resize                         (target dimensions)
+//   4. sharpen                        (laplacian on resized canvas)
+//   5. grain                          (deterministic when grainSeedLocked)
+//   6. quantization                   (full path only — worker)
+//   7. CRT                            (post-effect)
+//
+// If you change one path, change all three. There is no runtime test enforcing
+// this — the cost of a real pixel-comparison fixture in jsdom outweighs the
+// benefit. Verify visually after edits with blur=2 and brightness shifts.
+
 // --- Source image cache (two resolutions) ---
 let _cachedSrc = '';
 let _cachedFull: HTMLCanvasElement | null = null;
 let _cachedPreview: HTMLCanvasElement | null = null;
+let _cachedHash = '';
+
+// FNV-1a sampled over decoded pixels. Two sources that decode to the same image
+// produce the same hash regardless of base64 encoder differences (e.g., a PNG
+// re-saved by a different tool). Sample step 17 is coprime with 4 so all RGBA
+// channels are touched and runtime stays under ~1 ms even for 1024×1024.
+function computePixelHash(canvas: HTMLCanvasElement): string {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return `${canvas.width}x${canvas.height}-nohash`;
+  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  let h = 0x811c9dc5 >>> 0;
+  for (let i = 0; i < data.length; i += 17) {
+    h = (h ^ data[i]) >>> 0;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${canvas.width}x${canvas.height}-${h.toString(16)}`;
+}
+
+export function getSourceHash(): string {
+  return _cachedHash;
+}
 
 function capCanvas(canvas: HTMLCanvasElement, maxDim: number): HTMLCanvasElement {
   if (canvas.width <= maxDim && canvas.height <= maxDim) return canvas;
@@ -284,6 +335,7 @@ async function ensureCache(sourceBase64: string) {
   _cachedFull = capCanvas(raw, 1024);
   _cachedPreview = capCanvas(raw, 512);
   _cachedSrc = sourceBase64;
+  _cachedHash = computePixelHash(_cachedFull);
 }
 
 export async function getCachedSource(sourceBase64: string): Promise<HTMLCanvasElement> {
@@ -318,20 +370,25 @@ const FAST_PREVIEW_MAX_DIM = 512;
 // --- Fast preview intermediate cache ---
 // Expensive pipeline stages cached per input-signature. When the user drags a
 // slider that only affects stage N, stages 1..N-1 are reused.
+//
+// Order matches processFullPipeline so preview is WYSIWYG with the export:
+//   color/levels/transparency → blur → resize → sharpen → grain → CRT
 type StageCacheEntry = { key: string; canvas: HTMLCanvasElement };
 const _pipelineCache: {
   sourceRef: HTMLCanvasElement | null;
-  stage2: StageCacheEntry | null; // after resize + blur
-  stage3: StageCacheEntry | null; // after transparency/levels/color/grain
-  stage4: StageCacheEntry | null; // after sharpen
-} = { sourceRef: null, stage2: null, stage3: null, stage4: null };
+  stageColor: StageCacheEntry | null;       // after transparency/levels/color
+  stagePostBlur: StageCacheEntry | null;    // + blur
+  stagePostResize: StageCacheEntry | null;  // + resize
+  stagePostSharpen: StageCacheEntry | null; // + sharpen
+} = { sourceRef: null, stageColor: null, stagePostBlur: null, stagePostResize: null, stagePostSharpen: null };
 
 function invalidateCacheIfSourceChanged(source: HTMLCanvasElement) {
   if (_pipelineCache.sourceRef !== source) {
     _pipelineCache.sourceRef = source;
-    _pipelineCache.stage2 = null;
-    _pipelineCache.stage3 = null;
-    _pipelineCache.stage4 = null;
+    _pipelineCache.stageColor = null;
+    _pipelineCache.stagePostBlur = null;
+    _pipelineCache.stagePostResize = null;
+    _pipelineCache.stagePostSharpen = null;
   }
 }
 
@@ -340,7 +397,8 @@ export interface FastPreviewOpts {
   dragActive?: boolean;
 }
 
-/** Fast preview with per-stage memoization. No quantization, no base64. */
+/** Fast preview with per-stage memoization. No quantization, no base64.
+ * Order mirrors processFullPipeline so preview matches the exported result. */
 export function processFastPreview(
   sourceCanvas: HTMLCanvasElement,
   settings: ConverterSettings,
@@ -357,82 +415,105 @@ export function processFastPreview(
     h = Math.max(1, Math.round(h * scale));
   }
 
-  // Stage 2: resize + blur
-  const stage2Key = `${w}|${h}|${settings.sampleMode}|${settings.blurAmount}`;
-  let stage2: HTMLCanvasElement;
-  if (_pipelineCache.stage2 && _pipelineCache.stage2.key === stage2Key) {
-    stage2 = _pipelineCache.stage2.canvas;
-  } else {
-    let c = resizeImage(sourceCanvas, w, h, settings.sampleMode);
-    c = applyBlur(c, settings.blurAmount);
-    stage2 = c;
-    _pipelineCache.stage2 = { key: stage2Key, canvas: c };
-  }
-
-  // Stage 3: transparency + levels + color + grain (pixel ops)
-  // Grain uses Math.random — cache only deterministic runs.
-  const canCache3 = settings.grainAmount === 0;
   const s = settings;
-  const stage3Key = `${stage2Key}|${s.transparencyMode}|${s.alphaThreshold}|${s.colorKeyHex}|${s.levelsInLow}|${s.levelsInHigh}|${s.levelsOutLow}|${s.levelsOutHigh}|${s.brightness}|${s.contrast}|${s.saturation}|${s.hue}|${s.gamma}|${s.tintRed}|${s.tintGreen}|${s.tintBlue}|${s.posterize}|${s.grainAmount}`;
-  let stage3: HTMLCanvasElement;
-  if (canCache3 && _pipelineCache.stage3 && _pipelineCache.stage3.key === stage3Key) {
-    stage3 = _pipelineCache.stage3.canvas;
+
+  // Stage 1: transparency + levels + color (on full source canvas, pre-resize).
+  // Operates on cached source ref so this stage is rebuilt only when those settings change.
+  const stageColorKey = `${s.transparencyMode}|${s.alphaThreshold}|${s.colorKeyHex}|${s.levelsInLow}|${s.levelsInHigh}|${s.levelsOutLow}|${s.levelsOutHigh}|${s.brightness}|${s.contrast}|${s.saturation}|${s.hue}|${s.gamma}|${s.tintRed}|${s.tintGreen}|${s.tintBlue}|${s.posterize}`;
+  let stageColor: HTMLCanvasElement;
+  if (_pipelineCache.stageColor && _pipelineCache.stageColor.key === stageColorKey) {
+    stageColor = _pipelineCache.stageColor.canvas;
   } else {
-    const data = canvasToImageData(stage2);
+    const data = canvasToImageData(sourceCanvas);
     applyTransparency(data, settings);
     applyLevels(data, settings);
     applyColorAdjustments(data, settings);
-    applyGrain(data, settings.grainAmount);
-    stage3 = imageDataToCanvas(data);
-    _pipelineCache.stage3 = canCache3 ? { key: stage3Key, canvas: stage3 } : null;
+    stageColor = imageDataToCanvas(data);
+    _pipelineCache.stageColor = { key: stageColorKey, canvas: stageColor };
   }
 
-  // Stage 4: sharpen (skipped during active drag — O(n*4) neighbor reads)
-  const effSharpen = dragActive ? 0 : settings.sharpenAmount;
-  const stage4Key = `${stage3Key}|${effSharpen}`;
-  let stage4: HTMLCanvasElement;
-  if (canCache3 && _pipelineCache.stage4 && _pipelineCache.stage4.key === stage4Key) {
-    stage4 = _pipelineCache.stage4.canvas;
+  // Stage 2: blur (post-color, pre-resize — matches full pipeline).
+  const stagePostBlurKey = `${stageColorKey}|${s.blurAmount}`;
+  let stagePostBlur: HTMLCanvasElement;
+  if (_pipelineCache.stagePostBlur && _pipelineCache.stagePostBlur.key === stagePostBlurKey) {
+    stagePostBlur = _pipelineCache.stagePostBlur.canvas;
   } else {
-    stage4 = applySharpen(stage3, effSharpen);
-    _pipelineCache.stage4 = canCache3 ? { key: stage4Key, canvas: stage4 } : null;
+    stagePostBlur = applyBlur(stageColor, s.blurAmount);
+    _pipelineCache.stagePostBlur = { key: stagePostBlurKey, canvas: stagePostBlur };
   }
 
-  // Stage 5: CRT (skipped during active drag — extra getImageData/putImageData pass)
-  if (!dragActive && settings.crtEnabled) {
+  // Stage 3: resize.
+  const stagePostResizeKey = `${stagePostBlurKey}|${w}|${h}|${s.sampleMode}`;
+  let stagePostResize: HTMLCanvasElement;
+  if (_pipelineCache.stagePostResize && _pipelineCache.stagePostResize.key === stagePostResizeKey) {
+    stagePostResize = _pipelineCache.stagePostResize.canvas;
+  } else {
+    stagePostResize = resizeImage(stagePostBlur, w, h, s.sampleMode);
+    _pipelineCache.stagePostResize = { key: stagePostResizeKey, canvas: stagePostResize };
+  }
+
+  // Stage 4: sharpen (skipped during active drag — O(n*4) neighbor reads).
+  const effSharpen = dragActive ? 0 : s.sharpenAmount;
+  const stagePostSharpenKey = `${stagePostResizeKey}|${effSharpen}`;
+  let stagePostSharpen: HTMLCanvasElement;
+  if (_pipelineCache.stagePostSharpen && _pipelineCache.stagePostSharpen.key === stagePostSharpenKey) {
+    stagePostSharpen = _pipelineCache.stagePostSharpen.canvas;
+  } else {
+    stagePostSharpen = applySharpen(stagePostResize, effSharpen);
+    _pipelineCache.stagePostSharpen = { key: stagePostSharpenKey, canvas: stagePostSharpen };
+  }
+
+  // Stage 5: grain. Not cached when seed unlocked (Math.random — non-deterministic).
+  let stagePostGrain: HTMLCanvasElement = stagePostSharpen;
+  if (s.grainAmount > 0) {
+    const grainData = canvasToImageData(stagePostSharpen);
+    applyGrain(grainData, s.grainAmount, s.grainSeedLocked ? s.grainSeed : undefined);
+    stagePostGrain = imageDataToCanvas(grainData);
+  }
+
+  // Stage 6: CRT (skipped during active drag — extra getImageData/putImageData pass).
+  if (!dragActive && s.crtEnabled) {
     try {
-      return applyCRTFilter(stage4, {
-        scanlineIntensity: settings.crtScanlines,
-        rgbShift: settings.crtRgbShift,
-        vignette: settings.crtVignette,
+      return applyCRTFilter(stagePostGrain, {
+        scanlineIntensity: s.crtScanlines,
+        rgbShift: s.crtRgbShift,
+        vignette: s.crtVignette,
       });
     } catch (err) { console.warn('Fast-preview CRT failed:', err); }
   }
-  return stage4;
+  return stagePostGrain;
 }
 
 // --- Full pipeline quantization cache ---
 // Post-quant effects (CRT) depend only on the quantized output. When the user
 // only tweaks CRT, we skip the expensive quantize step by reusing the cached
 // quantized ImageData keyed on the full upstream signature.
+//
+// Source identity now uses the pixel-hash from _cachedHash (computePixelHash)
+// instead of the raw base64 string. Two distinct dataURLs that decode to the
+// same pixels collapse to one cache slot.
 type QuantCacheEntry = {
   key: string;
   quantized: ImageData;
   generatedPalette: import('@/types').PaletteColor[];
 };
 let _quantCache: QuantCacheEntry | null = null;
-let _quantCacheSource = '';
 
-function quantSignature(sourceBase64: string, s: ConverterSettings): string {
+function quantSignature(sourceHash: string, s: ConverterSettings): string {
   const palette = s.palette.map((c) => `${c.r},${c.g},${c.b}`).join(';');
   return [
-    sourceBase64.length, // proxy — full source compared via _quantCacheSource
+    `src:${sourceHash}`,
     s.sizeMode, s.width, s.height, s.sampleMode,
     s.blurAmount, s.sharpenAmount,
     s.transparencyMode, s.alphaThreshold, s.colorKeyHex,
     s.levelsInLow, s.levelsInHigh, s.levelsOutLow, s.levelsOutHigh,
     s.brightness, s.contrast, s.saturation, s.hue, s.gamma,
     s.tintRed, s.tintGreen, s.tintBlue, s.posterize, s.grainAmount,
+    // Seed contributes to signature only when grain is active. When unlocked,
+    // each call gets a fresh random sequence, so we tag it as uncacheable.
+    s.grainAmount > 0
+      ? (s.grainSeedLocked ? `seed:${s.grainSeed}` : `seed:rand:${Math.random()}`)
+      : 'seed:none',
     s.colorCount, s.ditherMode, s.ditherAmount, s.distanceMetric,
     s.useKMeansPlusPlus, palette,
   ].join('|');
@@ -445,8 +526,8 @@ export async function processFullPipeline(
 ): Promise<{ resultCanvas: HTMLCanvasElement; generatedPalette: import('@/types').PaletteColor[] }> {
   const sourceCanvas = await getCachedSource(sourceBase64);
 
-  const sig = quantSignature(sourceBase64, settings);
-  const cacheHit = _quantCacheSource === sourceBase64 && _quantCache?.key === sig;
+  const sig = quantSignature(_cachedHash, settings);
+  const cacheHit = _quantCache?.key === sig;
 
   let quantized: ImageData;
   let generatedPalette: import('@/types').PaletteColor[];
@@ -476,7 +557,7 @@ export async function processFullPipeline(
 
     // Grain (pre-quantize for consistent output)
     const preQuantData = canvasToImageData(current);
-    applyGrain(preQuantData, settings.grainAmount);
+    applyGrain(preQuantData, settings.grainAmount, settings.grainSeedLocked ? settings.grainSeed : undefined);
     current = imageDataToCanvas(preQuantData);
 
     // Quantization — offloaded to Web Worker; buffer is transferred.
@@ -486,7 +567,6 @@ export async function processFullPipeline(
     generatedPalette = out.generatedPalette;
 
     _quantCache = { key: sig, quantized, generatedPalette };
-    _quantCacheSource = sourceBase64;
 
     // Seed tier-2 fast preview with this palette for the next drag.
     setLastPalette(sourceBase64, generatedPalette);
@@ -530,19 +610,24 @@ export async function processFastQuantPreview(
       h = Math.max(1, Math.round(h * scale));
     }
 
-    // Stages 1-4 inline (no cache: this path is async + latest-wins,
-    // the O(pixels) work at 256 is cheap enough to redo).
-    let c = resizeImage(sourceCanvas, w, h, settings.sampleMode);
+    // Order matches processFullPipeline (color → blur → resize → sharpen → grain).
+    // No cache: this path is async + latest-wins, O(pixels) at 256 is cheap enough.
+    const colorData = canvasToImageData(sourceCanvas);
+    applyTransparency(colorData, settings);
+    applyLevels(colorData, settings);
+    applyColorAdjustments(colorData, settings);
+    let c = imageDataToCanvas(colorData);
+
     c = applyBlur(c, settings.blurAmount);
-
-    const data = canvasToImageData(c);
-    applyTransparency(data, settings);
-    applyLevels(data, settings);
-    applyColorAdjustments(data, settings);
-    applyGrain(data, settings.grainAmount);
-    c = imageDataToCanvas(data);
-
+    c = resizeImage(c, w, h, settings.sampleMode);
     c = applySharpen(c, settings.sharpenAmount);
+
+    // Grain post-sharpen, pre-quant.
+    if (settings.grainAmount > 0) {
+      const grainData = canvasToImageData(c);
+      applyGrain(grainData, settings.grainAmount, settings.grainSeedLocked ? settings.grainSeed : undefined);
+      c = imageDataToCanvas(grainData);
+    }
 
     // Only freeze palette in generated mode. Custom palette is already fast.
     const frozenPalette = settings.palette.length === 0

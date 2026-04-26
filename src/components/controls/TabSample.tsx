@@ -134,6 +134,20 @@ export function TabSample() {
     }
   }, [lockAspect, aspectRatio, isRelative, updateSettings]);
 
+  // Toggle lock — when activating, snap height to source aspect immediately
+  // (instead of waiting for the user to move a slider).
+  const handleToggleLock = useCallback(() => {
+    if (!lockAspect) {
+      if (isRelative) {
+        updateSettings({ height: settings.width });
+      } else {
+        const h = Math.max(1, Math.round(settings.width / aspectRatio));
+        updateSettings({ height: h });
+      }
+    }
+    setLockAspect((v) => !v);
+  }, [lockAspect, isRelative, settings.width, aspectRatio, updateSettings]);
+
   return (
     <div className="space-y-5">
       <div className="flex gap-2">
@@ -168,6 +182,63 @@ export function TabSample() {
           {t('sample.relative')}
         </button>
       </div>
+
+      {/* Target size preset (absolute mode only — gamedev workflow) */}
+      {settings.sizeMode === 'absolute' && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1">
+            <Label className="text-[11px]">{t('sample.targetPreset')}</Label>
+            <InfoTip text={t('sample.targetPresetTip')} />
+          </div>
+          <Select
+            value={(() => {
+              const longSide = Math.max(settings.width, settings.height);
+              const presets = [16, 32, 64, 128, 256, 512, 1024];
+              if (!presets.includes(longSide)) return 'custom';
+              if (lockAspect) {
+                // Aspect-aware match: long-side equals preset and short-side
+                // matches the source aspect within ±1px rounding.
+                const expectedShort = aspectRatio >= 1
+                  ? Math.max(1, Math.round(longSide / aspectRatio))
+                  : Math.max(1, Math.round(longSide * aspectRatio));
+                const actualShort = Math.min(settings.width, settings.height);
+                return Math.abs(expectedShort - actualShort) <= 1 ? String(longSide) : 'custom';
+              }
+              // Lock off: dropdown only matches when output is a perfect square.
+              return settings.width === longSide && settings.height === longSide
+                ? String(longSide)
+                : 'custom';
+            })()}
+            onValueChange={(v) => {
+              if (!v || v === 'custom') return;
+              const size = parseInt(v, 10);
+              if (!size) return;
+              if (lockAspect) {
+                const w = aspectRatio >= 1 ? size : Math.max(1, Math.round(size * aspectRatio));
+                const h = aspectRatio >= 1 ? Math.max(1, Math.round(size / aspectRatio)) : size;
+                updateSettings({ width: w, height: h });
+              } else {
+                // No aspect lock → square output as the user requested.
+                updateSettings({ width: size, height: size });
+              }
+            }}
+          >
+            <SelectTrigger className="h-9 text-[11px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="custom">{t('sample.targetCustom')}</SelectItem>
+              <SelectItem value="16">16</SelectItem>
+              <SelectItem value="32">32</SelectItem>
+              <SelectItem value="64">64</SelectItem>
+              <SelectItem value="128">128</SelectItem>
+              <SelectItem value="256">256</SelectItem>
+              <SelectItem value="512">512</SelectItem>
+              <SelectItem value="1024">1024</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Width + lock + Height */}
       <div className="flex gap-3 items-start">
@@ -216,7 +287,7 @@ export function TabSample() {
 
         {/* Aspect lock button between the two */}
         <div className="flex flex-col items-center justify-center pt-5">
-          <AspectLockButton locked={lockAspect} onClick={() => setLockAspect(!lockAspect)} lockTitle={t('sample.lockAspect')} unlockTitle={t('sample.unlockAspect')} />
+          <AspectLockButton locked={lockAspect} onClick={handleToggleLock} lockTitle={t('sample.lockAspect')} unlockTitle={t('sample.unlockAspect')} />
         </div>
       </div>
 

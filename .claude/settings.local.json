@@ -30,7 +30,11 @@
       "Bash(echo \"EXIT=$?\")",
       "mcp__plugin_socraticode_socraticode__codebase_index",
       "WebFetch(domain:www.humanlayer.dev)",
-      "WebFetch(domain:www.makeareadme.com)"
+      "WebFetch(domain:www.makeareadme.com)",
+      "WebFetch(domain:img2pixel.com)",
+      "WebFetch(domain:giventofly.github.io)",
+      "WebFetch(domain:captain4lk.itch.io)",
+      "Bash(npm run *)"
     ]
   }
 }

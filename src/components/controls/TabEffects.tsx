@@ -81,15 +81,71 @@ export function TabEffects() {
       </div>
 
       {/* Film Grain */}
-      <SliderControl
-        label={t('effects.grain')}
-        tip={t('effects.grainTip')}
-        value={settings.grainAmount}
-        defaultValue={d.grainAmount}
-        onChange={(v) => updateSettings({ grainAmount: v })}
-        min={0} max={1} step={0.01}
-        format={(v) => v === 0 ? 'Off' : `${Math.round(v * 100)}%`}
-      />
+      <div>
+        <SliderControl
+          label={t('effects.grain')}
+          tip={t('effects.grainTip')}
+          value={settings.grainAmount}
+          defaultValue={d.grainAmount}
+          onChange={(v) => updateSettings({ grainAmount: v })}
+          min={0} max={1} step={0.01}
+          format={(v) => v === 0 ? 'Off' : `${Math.round(v * 100)}%`}
+        />
+        {settings.grainAmount > 0 && (
+          <div className="flex items-center gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (settings.grainSeedLocked) {
+                  updateSettings({ grainSeedLocked: false });
+                } else {
+                  const seed = Math.floor(Math.random() * 0xffffffff) >>> 0;
+                  updateSettings({ grainSeed: seed, grainSeedLocked: true });
+                }
+              }}
+              className={`flex items-center gap-1.5 text-[11px] px-2 h-6 rounded border transition-colors ${
+                settings.grainSeedLocked
+                  ? 'border-primary/60 text-primary bg-primary/10'
+                  : 'border-border text-muted-foreground hover:text-foreground'
+              }`}
+              aria-pressed={settings.grainSeedLocked}
+              aria-label={settings.grainSeedLocked ? t('effects.grainSeedUnlock') : t('effects.grainSeedLock')}
+              title={settings.grainSeedLocked ? t('effects.grainSeedUnlock') : t('effects.grainSeedLock')}
+            >
+              <svg aria-hidden="true" focusable="false" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                {settings.grainSeedLocked ? (
+                  <>
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                    <path d="M7 11V7a5 5 0 0110 0v4" />
+                  </>
+                ) : (
+                  <>
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                    <path d="M7 11V7a5 5 0 019.9-1" />
+                  </>
+                )}
+              </svg>
+              {settings.grainSeedLocked ? t('effects.grainSeedLocked') : t('effects.grainSeedRandom')}
+            </button>
+            {settings.grainSeedLocked && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const seed = Math.floor(Math.random() * 0xffffffff) >>> 0;
+                    updateSettings({ grainSeed: seed });
+                  }}
+                  className="text-[10px] font-mono text-muted-foreground/70 hover:text-primary transition-colors"
+                  title={t('effects.grainSeedRegenerate')}
+                  aria-label={t('effects.grainSeedRegenerate')}
+                >
+                  {settings.grainSeed.toString(16).padStart(8, '0')}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* CRT Effect */}
       <div className="pt-3 border-t border-border space-y-5">
