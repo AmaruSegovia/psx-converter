@@ -143,18 +143,31 @@ export function PresetLoadDialog() {
 
   const handleLoadUser = (id: string, name: string) => {
     setPendingHistoryLabel(`Preset: ${name}`);
-    loadPreset(id);
+    // If user-preset has lockAspect, re-derive dims for current source so the
+    // saved long-side maps onto the loaded image's aspect ratio.
+    const userPreset = presets.find((p) => p.id === id);
+    if (userPreset && userPreset.settings.lockAspect && originalWidth > 0) {
+      const maxDim = presetMaxDim(userPreset.settings);
+      const { w, h } = dimsFromAspect(originalWidth, originalHeight, maxDim);
+      loadSettings({ ...userPreset.settings, width: w, height: h, sizeMode: 'absolute' });
+    } else {
+      loadPreset(id);
+    }
     toast.success(t('toast.presetLoaded', { name }));
     setOpen(false);
   };
 
   const handleLoadFactory = (settings: ConverterSettings, name: string) => {
     setPendingHistoryLabel(`Preset: ${name}`);
-    // Adapt preset dims to current source aspect at preset's native pixel scale.
-    // Matches thumbnail's aspect-preserving render so loaded result ≈ preview.
-    const maxDim = presetMaxDim(settings);
-    const { w, h } = dimsFromAspect(originalWidth, originalHeight, maxDim);
-    loadSettings({ ...settings, width: w, height: h, sizeMode: 'absolute' });
+    if (settings.lockAspect && originalWidth > 0) {
+      // Adapt preset dims to current source aspect at preset's native pixel scale.
+      const maxDim = presetMaxDim(settings);
+      const { w, h } = dimsFromAspect(originalWidth, originalHeight, maxDim);
+      loadSettings({ ...settings, width: w, height: h, sizeMode: 'absolute' });
+    } else {
+      // lockAspect=false: keep preset's literal dims (e.g. GameBoy 160×144).
+      loadSettings(settings);
+    }
     toast.success(t('toast.presetLoaded', { name }));
     setOpen(false);
   };

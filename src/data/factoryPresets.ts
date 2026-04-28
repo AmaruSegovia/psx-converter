@@ -52,6 +52,7 @@ export const FACTORY_PRESETS: FactoryPreset[] = [
     settings: make({
       width: 128,
       height: 128,
+      lockAspect: true,
       colorCount: 16,
       ditherMode: 'floyd-steinberg',
       ditherAmount: 0.3,
@@ -74,6 +75,7 @@ export const FACTORY_PRESETS: FactoryPreset[] = [
     settings: make({
       width: 128,
       height: 128,
+      lockAspect: true,
       colorCount: 16,
       ditherMode: 'floyd-steinberg',
       ditherAmount: 0.4,
@@ -103,6 +105,9 @@ export const FACTORY_PRESETS: FactoryPreset[] = [
     settings: make({
       width: 160,
       height: 144,
+      // GameBoy is hardware-locked at 160×144 regardless of source aspect —
+      // the preset's identity IS those exact dimensions.
+      lockAspect: false,
       colorCount: 4,
       ditherMode: 'bayer-4x4',
       ditherAmount: 0.75,
@@ -123,6 +128,7 @@ export const FACTORY_PRESETS: FactoryPreset[] = [
     settings: make({
       width: 64,
       height: 64,
+      lockAspect: true,
       colorCount: 32,
       ditherMode: 'none',
       paletteSource: 'generated',
@@ -143,6 +149,7 @@ export const FACTORY_PRESETS: FactoryPreset[] = [
     settings: make({
       width: 256,
       height: 256,
+      lockAspect: true,
       colorCount: 32,
       ditherMode: 'floyd-steinberg',
       ditherAmount: 0.22,
@@ -168,6 +175,7 @@ export const FACTORY_PRESETS: FactoryPreset[] = [
     settings: make({
       width: 128,
       height: 128,
+      lockAspect: true,
       colorCount: 16,
       ditherMode: 'floyd-steinberg',
       ditherAmount: 0.15,
@@ -186,6 +194,7 @@ export const FACTORY_PRESETS: FactoryPreset[] = [
     settings: make({
       width: 128,
       height: 128,
+      lockAspect: true,
       colorCount: 4,
       ditherMode: 'bayer-4x4',
       ditherAmount: 0.9,
@@ -207,6 +216,7 @@ export const FACTORY_PRESETS: FactoryPreset[] = [
     settings: make({
       width: 192,
       height: 192,
+      lockAspect: true,
       colorCount: 48,
       ditherMode: 'jarvis',
       ditherAmount: 0.15,

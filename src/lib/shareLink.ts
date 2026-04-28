@@ -21,6 +21,7 @@ const SHORT_NAMES: Record<keyof ConverterSettings, string> = {
   palette: 'pal',
   paletteSource: 'ps',
   lospecSlug: 'ls',
+  lockAspect: 'la',
   posterize: 'post',
   brightness: 'b',
   contrast: 'c',

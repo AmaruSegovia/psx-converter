@@ -20,6 +20,13 @@ export interface ConverterSettings {
   useKMeansPlusPlus: boolean;
   palette: PaletteColor[];
   paletteSource: 'generated' | 'lospec' | 'builtin' | 'custom' | 'psx555';
+  /**
+   * When true, the largest of (width, height) is treated as the "long side"
+   * target. Loading a new image (or applying a preset) re-derives the other
+   * dim from the source's aspect ratio. When false, both dims are honored
+   * literally, clamped to source size.
+   */
+  lockAspect: boolean;
   lospecSlug: string;
 
   // Tab Colors
@@ -97,6 +104,7 @@ export const DEFAULT_SETTINGS: ConverterSettings = {
   palette: [],
   paletteSource: 'generated',
   lospecSlug: '',
+  lockAspect: true,
   posterize: 0,
   brightness: 0,
   contrast: 1.0,

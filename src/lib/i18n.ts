@@ -188,6 +188,10 @@ export const translations = {
     'shortcuts.preset': 'Load factory preset 1…9',
     'shortcuts.help': 'Show shortcuts',
 
+    // Feedback
+    'feedback.report': 'Report a bug',
+    'feedback.reportTip': 'Opens a pre-filled GitHub issue with your current settings as context.',
+
     // History
     'sidebar.history': 'History',
     'sidebar.clearHistory': 'Clear history',
@@ -466,6 +470,9 @@ export const translations = {
     'shortcuts.export': 'Exportar PNG',
     'shortcuts.preset': 'Cargar preset factory 1…9',
     'shortcuts.help': 'Mostrar atajos',
+
+    'feedback.report': 'Reportar un bug',
+    'feedback.reportTip': 'Abre un issue de GitHub pre-cargado con tu configuración actual como contexto.',
 
     'sidebar.history': 'Historial',
     'sidebar.clearHistory': 'Limpiar historial',

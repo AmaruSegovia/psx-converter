@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useConverterStore } from '@/store/converterStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { InfoTip } from '@/components/ui/info-tip';
@@ -42,7 +42,7 @@ export function TabSample() {
   const updateSettings = useConverterStore((s) => s.updateSettings);
   const originalWidth = useConverterStore((s) => s.originalWidth);
   const originalHeight = useConverterStore((s) => s.originalHeight);
-  const [lockAspect, setLockAspect] = useState(false);
+  const lockAspect = settings.lockAspect;
 
   const isRelative = settings.sizeMode === 'relative';
   const widthMax = isRelative ? 100 : (originalWidth || 1024);
@@ -84,13 +84,14 @@ export function TabSample() {
   const handleToggleLock = useCallback(() => {
     if (!lockAspect) {
       if (isRelative) {
-        updateSettings({ height: settings.width });
+        updateSettings({ lockAspect: true, height: settings.width });
       } else {
         const h = Math.max(1, Math.round(settings.width / aspectRatio));
-        updateSettings({ height: h });
+        updateSettings({ lockAspect: true, height: h });
       }
+    } else {
+      updateSettings({ lockAspect: false });
     }
-    setLockAspect((v) => !v);
   }, [lockAspect, isRelative, settings.width, aspectRatio, updateSettings]);
 
   return (

@@ -6,6 +6,7 @@ import { useImageProcessor } from '@/hooks/useImageProcessor';
 import { useTranslation } from '@/hooks/useTranslation';
 import { exportPNG, loadImage, processFullPipeline, upscaleNearestNeighbor } from '@/lib/imageProcessing';
 import { buildIndexedPng, downloadIndexedPng } from '@/lib/exportIndexedPng';
+import { fitDimsToSource } from '@/lib/aspectFit';
 import { subscribeCanvas, getResultDimensions } from '@/lib/canvasBus';
 import { onWorkerCrash } from '@/lib/quantizationClient';
 import { Button } from '@/components/ui/button';
@@ -270,13 +271,23 @@ export function AppShell() {
         store.setOriginalDimensions(img.naturalWidth, img.naturalHeight);
         const s = store.settings;
         if (s.sizeMode === 'absolute') {
-          store.updateSettings({
-            width: Math.min(img.naturalWidth, s.width),
-            height: Math.min(img.naturalHeight, s.height),
+          // Re-fit width/height for the new source. Lock-aware: when locked
+          // we keep the current long-side as the target and re-derive the
+          // short-side from the new aspect; when unlocked we keep the
+          // user-chosen dims and only clamp.
+          const fitted = fitDimsToSource({
+            width: s.width,
+            height: s.height,
+            lockAspect: s.lockAspect,
+            sourceWidth: img.naturalWidth,
+            sourceHeight: img.naturalHeight,
           });
-        } else {
+          store.updateSettings(fitted);
+        } else if (s.lockAspect) {
+          // Relative + lock: same % on both sides preserves source aspect.
           store.updateSettings({ width: 100, height: 100 });
         }
+        // Relative + unlocked: keep user's percentages as-is.
         toast.success(`${t('toast.imageLoaded')} (${img.naturalWidth} x ${img.naturalHeight}px)`);
       } catch {
         toast.error(t('dropzone.loadError'));
@@ -755,7 +766,7 @@ export function AppShell() {
               </div>
             ))}
           </div>
-          <div className="pt-2 border-t border-border">
+          <div className="pt-2 border-t border-border space-y-2">
             <Button
               size="sm" variant="outline" className="text-[11px] w-full"
               onClick={() => {
@@ -765,6 +776,44 @@ export function AppShell() {
               }}
             >
               {t('tour.replay')}
+            </Button>
+            <Button
+              size="sm" variant="outline" className="text-[11px] w-full gap-1.5"
+              onClick={() => {
+                const settings = useConverterStore.getState().settings;
+                const dims = useConverterStore.getState();
+                const body = [
+                  '## Describí el problema',
+                  '<!-- ¿Qué esperabas? ¿Qué pasó? Pasos para reproducir. -->',
+                  '',
+                  '## Contexto',
+                  `- App URL: ${window.location.href}`,
+                  `- User-Agent: ${navigator.userAgent}`,
+                  `- Source dims: ${dims.originalWidth}×${dims.originalHeight}`,
+                  `- Output dims: ${settings.width}×${settings.height} (${settings.sizeMode})`,
+                  `- Lock aspect: ${settings.lockAspect}`,
+                  `- Palette source: ${settings.paletteSource}`,
+                  `- Dither: ${settings.ditherMode} @ ${settings.ditherAmount}`,
+                  `- Color count: ${settings.colorCount}`,
+                  '',
+                  '## Settings (JSON)',
+                  '<details><summary>Mostrar</summary>',
+                  '',
+                  '```json',
+                  JSON.stringify(settings, null, 2),
+                  '```',
+                  '</details>',
+                ].join('\n');
+                const url = `https://github.com/AmaruSegovia/psx-converter/issues/new?title=${encodeURIComponent('[bug] ')}&body=${encodeURIComponent(body)}`;
+                window.open(url, '_blank', 'noopener,noreferrer');
+              }}
+              title={t('feedback.reportTip')}
+            >
+              <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M12 9v4M12 17h.01" />
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              {t('feedback.report')}
             </Button>
           </div>
         </DialogContent>

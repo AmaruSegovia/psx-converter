@@ -4,6 +4,7 @@ export type HistoryTab = 'sample' | 'dither' | 'palette' | 'colors' | 'effects';
 
 export const KEY_TO_TAB: Record<string, HistoryTab> = {
   width: 'sample', height: 'sample', sizeMode: 'sample', sampleMode: 'sample',
+  lockAspect: 'sample',
   blurAmount: 'sample', sharpenAmount: 'sample',
   alphaThreshold: 'dither', transparencyMode: 'dither', colorKeyHex: 'dither',
   distanceMetric: 'dither', ditherMode: 'dither', ditherAmount: 'dither',
@@ -19,6 +20,7 @@ export const KEY_TO_TAB: Record<string, HistoryTab> = {
 
 export const KEY_LABELS: Record<string, string> = {
   width: 'Width', height: 'Height', sizeMode: 'Size mode', sampleMode: 'Sample',
+  lockAspect: 'Aspect lock',
   blurAmount: 'Blur', sharpenAmount: 'Sharpen',
   alphaThreshold: 'Alpha', transparencyMode: 'Transparency', colorKeyHex: 'Color key',
   distanceMetric: 'Distance', ditherMode: 'Dither', ditherAmount: 'Dither amount',
@@ -54,7 +56,7 @@ export function tabsWithChanges(
   const result: Record<HistoryTab, boolean> = {
     sample: false, dither: false, palette: false, colors: false, effects: false,
   };
-  const SAMPLE_IGNORE = new Set(['width', 'height']);
+  const SAMPLE_IGNORE = new Set(['width', 'height', 'lockAspect']);
   for (const [key, tab] of Object.entries(KEY_TO_TAB)) {
     if (tab === 'sample' && SAMPLE_IGNORE.has(key)) continue;
     const k = key as keyof ConverterSettings;
