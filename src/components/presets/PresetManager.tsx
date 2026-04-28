@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { PresetCard } from './PresetCard';
 import { FACTORY_PRESETS } from '@/data/factoryPresets';
 import { processFullPipeline } from '@/lib/imageProcessing';
+import { clearLastPalette } from '@/lib/quantizationClient';
 import { toast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
 import { setPendingHistoryLabel } from '@/hooks/useUndoRedo';
@@ -51,9 +52,18 @@ export function PresetSaveDialog() {
   );
 }
 
-// Module-level cache: sourceImage base64 → Map<presetId, thumbnailBase64>
+// Module-level cache. Key = `${sourceImage}|${srcW}x${srcH}|${PRESET_SIG}`.
+// Including source dims invalidates stale entries when those change; the
+// preset signature invalidates when the factory list shifts (add/remove/dim).
+// Without these, switching aspect or editing a preset returns wrong thumbs
+// from a prior session run.
+const PRESET_SIG = FACTORY_PRESETS
+  .map((p) => `${p.id}:${p.settings.width}x${p.settings.height}:${p.settings.lockAspect ? 1 : 0}`)
+  .join(',');
 const thumbCache = new Map<string, Map<string, string>>();
-const THUMB_MAX = 128;
+function cacheKey(src: string, w: number, h: number): string {
+  return `${src}|${w}x${h}|${PRESET_SIG}`;
+}
 
 function dimsFromAspect(srcW: number, srcH: number, maxDim: number): { w: number; h: number; aspect: number } {
   if (srcW <= 0 || srcH <= 0) return { w: maxDim, h: maxDim, aspect: 1 };
@@ -74,6 +84,20 @@ function presetMaxDim(settings: ConverterSettings): number {
   return Math.max(settings.width, settings.height);
 }
 
+/** Compute the dims a preset will produce when applied to the current source.
+ * Mirrors handleLoadFactory's logic so thumbnails preview the actual result. */
+function presetTargetDims(
+  settings: ConverterSettings,
+  srcW: number,
+  srcH: number,
+): { w: number; h: number } {
+  if (settings.lockAspect && srcW > 0 && srcH > 0) {
+    const { w, h } = dimsFromAspect(srcW, srcH, presetMaxDim(settings));
+    return { w, h };
+  }
+  return { w: settings.width, h: settings.height };
+}
+
 export function PresetLoadDialog() {
   const { t } = useTranslation();
   const presets = useConverterStore((s) => s.presets);
@@ -86,10 +110,13 @@ export function PresetLoadDialog() {
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const computingRef = useRef(false);
 
-  const thumbDims = dimsFromAspect(originalWidth, originalHeight, THUMB_MAX);
-  // Clamp display aspect so portrait images don't blow up card height.
-  // Thumbnail itself keeps its real aspect; object-cover crops the overflow.
-  const displayAspect = Math.max(0.85, Math.min(1.3, thumbDims.aspect));
+  // Each card uses its OWN aspect (the dims the preset will actually produce).
+  // GameBoy is locked at 160×144 → its card is 1.11. PSX is source-aspect.
+  // No global displayAspect — letterbox/stretch would distort the preview.
+  const aspectFor = (settings: ConverterSettings): number => {
+    const { w, h } = presetTargetDims(settings, originalWidth, originalHeight);
+    return h > 0 ? w / h : 1;
+  };
 
   useEffect(() => {
     if (!open || !sourceImage) {
@@ -98,7 +125,8 @@ export function PresetLoadDialog() {
       return;
     }
 
-    const cached = thumbCache.get(sourceImage);
+    const ck = cacheKey(sourceImage, originalWidth, originalHeight);
+    const cached = thumbCache.get(ck);
     if (cached) {
       setPreviews(Object.fromEntries(cached));
       return;
@@ -110,11 +138,15 @@ export function PresetLoadDialog() {
 
     let cancelled = false;
     const map = new Map<string, string>();
-    const { w: thumbW, h: thumbH } = thumbDims;
 
     (async () => {
       for (const preset of FACTORY_PRESETS) {
         if (cancelled) break;
+        // Use the SAME dims the preset will produce when applied. Otherwise
+        // thumbnail at 128px ≠ live result at e.g. 64px (N64) or 160×144 (GB).
+        const { w: thumbW, h: thumbH } = presetTargetDims(
+          preset.settings, originalWidth, originalHeight,
+        );
         const thumbSettings: ConverterSettings = {
           ...preset.settings,
           width: thumbW,
@@ -131,7 +163,7 @@ export function PresetLoadDialog() {
           /* skip failed preset */
         }
       }
-      if (!cancelled) thumbCache.set(sourceImage, map);
+      if (!cancelled) thumbCache.set(ck, map);
       computingRef.current = false;
     })();
 
@@ -139,10 +171,15 @@ export function PresetLoadDialog() {
       cancelled = true;
       computingRef.current = false;
     };
-  }, [open, sourceImage, thumbDims.w, thumbDims.h]);
+  }, [open, sourceImage, originalWidth, originalHeight]);
 
   const handleLoadUser = (id: string, name: string) => {
     setPendingHistoryLabel(`Preset: ${name}`);
+    // Tier-2 reuses the last full-pipeline palette. After thumbnail generation
+    // ran ALL presets, _lastPalette holds whichever preset was processed last,
+    // not the one we're applying. Clear so tier-2 samples fresh and matches
+    // tier-3 (and the dialog thumbnail).
+    clearLastPalette();
     // If user-preset has lockAspect, re-derive dims for current source so the
     // saved long-side maps onto the loaded image's aspect ratio.
     const userPreset = presets.find((p) => p.id === id);
@@ -159,6 +196,7 @@ export function PresetLoadDialog() {
 
   const handleLoadFactory = (settings: ConverterSettings, name: string) => {
     setPendingHistoryLabel(`Preset: ${name}`);
+    clearLastPalette();
     if (settings.lockAspect && originalWidth > 0) {
       // Adapt preset dims to current source aspect at preset's native pixel scale.
       const maxDim = presetMaxDim(settings);
@@ -189,7 +227,7 @@ export function PresetLoadDialog() {
             <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wider mb-2">
               {t('preset.factory')}
             </p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3 items-start">
               {FACTORY_PRESETS.map((p) => (
                 <PresetCard
                   key={p.id}
@@ -198,7 +236,7 @@ export function PresetLoadDialog() {
                   description={p.description}
                   thumbnail={previews[p.id]}
                   thumbnailColors={p.thumbnailColors}
-                  aspectRatio={displayAspect}
+                  aspectRatio={aspectFor(p.settings)}
                   isFactory
                   isLoading={!!sourceImage && !previews[p.id]}
                   onClick={() => handleLoadFactory(p.settings, p.name)}
