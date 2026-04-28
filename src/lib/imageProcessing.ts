@@ -189,6 +189,15 @@ export function resizeImage(
   return output;
 }
 
+export function upscaleNearestNeighbor(
+  canvas: HTMLCanvasElement,
+  multiplier: number
+): HTMLCanvasElement {
+  const m = Math.max(1, Math.min(32, Math.floor(multiplier)));
+  if (m === 1) return canvas;
+  return resizeImage(canvas, canvas.width * m, canvas.height * m, 'nearest');
+}
+
 export function applySharpen(
   canvas: HTMLCanvasElement,
   amount: number

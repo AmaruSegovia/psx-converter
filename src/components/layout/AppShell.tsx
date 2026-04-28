@@ -4,12 +4,13 @@ import { toast } from 'sonner';
 import { useConverterStore } from '@/store/converterStore';
 import { useImageProcessor } from '@/hooks/useImageProcessor';
 import { useTranslation } from '@/hooks/useTranslation';
-import { exportPNG, loadImage, processFullPipeline } from '@/lib/imageProcessing';
+import { exportPNG, loadImage, processFullPipeline, upscaleNearestNeighbor } from '@/lib/imageProcessing';
 import { subscribeCanvas, getResultDimensions } from '@/lib/canvasBus';
 import { onWorkerCrash } from '@/lib/quantizationClient';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sidebar } from './Sidebar';
 import { ImageDropzone } from '@/components/preview/ImageDropzone';
 import { PreviewCanvas } from '@/components/preview/PreviewCanvas';
@@ -41,6 +42,33 @@ export function AppShell() {
   const [previewBgImage, setPreviewBgImage] = useState<string | null>(null);
   const bgFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Export scale (nearest-neighbor multiplier applied AFTER pipeline). Local
+  // state — not in ConverterSettings because it's a delivery concern, not
+  // processing. Persisted to localStorage so user's last choice survives
+  // refresh.
+  const [exportScale, setExportScaleRaw] = useState<number>(() => {
+    try {
+      const v = parseInt(localStorage.getItem('psx-export-scale') || '1', 10);
+      return Number.isFinite(v) ? Math.max(1, Math.min(32, v)) : 1;
+    } catch { return 1; }
+  });
+  const setExportScale = useCallback((n: number) => {
+    const clamped = Math.max(1, Math.min(32, Math.floor(n)));
+    setExportScaleRaw(clamped);
+    try { localStorage.setItem('psx-export-scale', String(clamped)); } catch { /* private mode */ }
+  }, []);
+  const [customScaleMode, setCustomScaleMode] = useState(false);
+  const [customScaleInput, setCustomScaleInput] = useState('');
+
+  const SCALE_PRESETS = [1, 2, 3, 4, 6, 8, 10, 16];
+  const isPresetScale = SCALE_PRESETS.includes(exportScale);
+
+  const commitCustomScale = useCallback(() => {
+    const n = parseInt(customScaleInput, 10);
+    if (Number.isFinite(n)) setExportScale(n);
+    setCustomScaleMode(false);
+  }, [customScaleInput, setExportScale]);
+
   // --- Smart filename ---
   const getExportFilename = useCallback((w?: number, h?: number) => {
     const store = useConverterStore.getState();
@@ -71,13 +99,19 @@ export function AppShell() {
     const settings = useConverterStore.getState().settings;
     try {
       const { resultCanvas } = await processFullPipeline(source, settings);
-      exportPNG(resultCanvas, getExportFilename(resultCanvas.width, resultCanvas.height));
+      const targetPixels = resultCanvas.width * resultCanvas.height * exportScale * exportScale;
+      if (targetPixels > 50_000_000) {
+        toast.error(t('toast.exportTooLarge'));
+        return;
+      }
+      const finalCanvas = upscaleNearestNeighbor(resultCanvas, exportScale);
+      exportPNG(finalCanvas, getExportFilename(finalCanvas.width, finalCanvas.height));
       toast.success(t('toast.exported'));
     } catch (err) {
       console.error('Export failed:', err);
       toast.error(t('toast.processingFailed'));
     }
-  }, [t, getExportFilename]);
+  }, [t, getExportFilename, exportScale]);
 
   const handleCopy = useCallback(async () => {
     const source = useConverterStore.getState().sourceImage;
@@ -88,18 +122,28 @@ export function AppShell() {
       // gesture alive while the pipeline runs. Avoids "not allowed" failures
       // in Safari when await between click and clipboard.write takes too long.
       const blobPromise = processFullPipeline(source, settings).then(
-        ({ resultCanvas }) =>
-          new Promise<Blob>((res, rej) =>
-            resultCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
-          )
+        ({ resultCanvas }) => {
+          const targetPixels = resultCanvas.width * resultCanvas.height * exportScale * exportScale;
+          if (targetPixels > 50_000_000) {
+            throw new Error('export-too-large');
+          }
+          const finalCanvas = upscaleNearestNeighbor(resultCanvas, exportScale);
+          return new Promise<Blob>((res, rej) =>
+            finalCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
+          );
+        }
       );
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
       toast.success(t('toast.copied'));
     } catch (err) {
       console.error('Copy failed:', err);
-      toast.error(t('toast.copyFailed'));
+      if (err instanceof Error && err.message === 'export-too-large') {
+        toast.error(t('toast.exportTooLarge'));
+      } else {
+        toast.error(t('toast.copyFailed'));
+      }
     }
-  }, [t]);
+  }, [t, exportScale]);
 
   const handleBatchExport = useCallback(async () => {
     const source = useConverterStore.getState().sourceImage;
@@ -120,10 +164,16 @@ export function AppShell() {
           const h = aspect >= 1 ? Math.max(1, Math.round(size / aspect)) : size;
           const batchSettings = { ...settings, width: w, height: h, sizeMode: 'absolute' as const };
           const { resultCanvas } = await processFullPipeline(source, batchSettings);
+          const targetPixels = resultCanvas.width * resultCanvas.height * exportScale * exportScale;
+          if (targetPixels > 50_000_000) {
+            failedSizes.push(size);
+            continue;
+          }
+          const finalCanvas = upscaleNearestNeighbor(resultCanvas, exportScale);
           const blob = await new Promise<Blob>((res, rej) =>
-            resultCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
+            finalCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
           );
-          zip.file(getExportFilename(w, h), blob);
+          zip.file(getExportFilename(finalCanvas.width, finalCanvas.height), blob);
         } catch (err) {
           console.error(`Batch export failed for size ${size}:`, err);
           failedSizes.push(size);
@@ -153,7 +203,7 @@ export function AppShell() {
       setBatchExporting(false);
       setShowBatchExport(false);
     }
-  }, [batchSizes, getExportFilename, t]);
+  }, [batchSizes, getExportFilename, t, exportScale]);
 
   const loadDroppedFile = useCallback((file: File) => {
     const reader = new FileReader();
@@ -210,10 +260,12 @@ export function AppShell() {
   }, [pendingReplaceFile, loadDroppedFile, paletteChoice]);
 
   // --- Effects ---
+  const [resultDims, setResultDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   useEffect(() => {
     return subscribeCanvas(() => {
-      const { w } = getResultDimensions();
+      const { w, h } = getResultDimensions();
       setHasResult(w > 0);
+      setResultDims({ w, h });
     });
   }, []);
 
@@ -454,12 +506,97 @@ export function AppShell() {
             </Button>
           )}
 
+          {hasResult && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-muted-foreground hidden sm:inline">{t('export.scale')}:</span>
+              {customScaleMode ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={1}
+                    max={32}
+                    step={1}
+                    value={customScaleInput}
+                    onChange={(e) => setCustomScaleInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitCustomScale();
+                      else if (e.key === 'Escape') setCustomScaleMode(false);
+                    }}
+                    onBlur={commitCustomScale}
+                    aria-label={t('export.scaleCustomLabel')}
+                    className="h-7 w-14 px-2 text-[11px] rounded border border-border bg-background"
+                    autoFocus
+                  />
+                  <span className="text-[11px] text-muted-foreground">×</span>
+                  {resultDims.w > 0 && (() => {
+                    const m = Math.max(1, Math.min(32, parseInt(customScaleInput, 10) || 1));
+                    return (
+                      <span className="text-[10px] text-muted-foreground/70 hidden md:inline">
+                        → {resultDims.w * m}×{resultDims.h * m}
+                      </span>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <Select
+                  value={isPresetScale ? String(exportScale) : 'custom'}
+                  onValueChange={(v) => {
+                    if (!v) return;
+                    if (v === 'custom') {
+                      setCustomScaleInput(String(exportScale));
+                      setCustomScaleMode(true);
+                    } else {
+                      setExportScale(parseInt(v, 10));
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    className="h-7 text-[11px] px-2 gap-1"
+                    title={t('export.scale')}
+                    aria-label={t('export.scale')}
+                  >
+                    <SelectValue>
+                      {isPresetScale && resultDims.w > 0 ? (
+                        <span className="inline-flex items-baseline gap-1">
+                          <span>{exportScale}×</span>
+                          <span className="text-[10px] text-muted-foreground/85">
+                            {resultDims.w * exportScale}×{resultDims.h * exportScale}
+                          </span>
+                        </span>
+                      ) : (
+                        `${exportScale}×`
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SCALE_PRESETS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {resultDims.w > 0 ? (
+                          <span className="inline-flex items-baseline gap-1.5">
+                            <span>{n}×</span>
+                            <span className="text-[10px] text-muted-foreground/85">
+                              {resultDims.w * n}×{resultDims.h * n}
+                            </span>
+                          </span>
+                        ) : (
+                          `${n}×`
+                        )}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="custom">{t('export.scaleCustom')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+
           <Button size="sm" data-tour="export" className="text-[11px] h-7 px-3 bg-primary hover:bg-primary/90"
             disabled={!hasResult || isProcessing} onClick={handleExport}>
             {t('header.export')}
           </Button>
         </div>
       </header>
+
 
       {/* Dialogs */}
       <Dialog open={!!pendingReplaceFile} onOpenChange={(o) => { if (!o) { setPendingReplaceFile(null); setPaletteChoice('keep'); } }}>
