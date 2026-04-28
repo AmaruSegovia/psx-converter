@@ -4,8 +4,31 @@ import { toast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useConverterStore } from '@/store/converterStore';
 import { loadImage } from '@/lib/imageProcessing';
+import { fitDimsToSource } from '@/lib/aspectFit';
 import { EXAMPLE_IMAGES } from '@/data/examples';
-import type { ExampleImage } from '@/types';
+import type { ConverterSettings, ExampleImage } from '@/types';
+import { DEFAULT_SETTINGS } from '@/types';
+
+/**
+ * Effects-related fields. If any differ from defaults, the user has
+ * customized — loading an example must NOT clobber their setup.
+ */
+const EFFECT_KEYS: (keyof ConverterSettings)[] = [
+  'sampleMode', 'blurAmount', 'sharpenAmount',
+  'alphaThreshold', 'transparencyMode', 'colorKeyHex',
+  'distanceMetric', 'ditherMode', 'ditherAmount',
+  'colorCount', 'useKMeansPlusPlus', 'paletteSource', 'lospecSlug',
+  'posterize', 'brightness', 'contrast', 'saturation', 'hue', 'gamma',
+  'tintRed', 'tintGreen', 'tintBlue',
+  'crtEnabled', 'crtScanlines', 'crtRgbShift', 'crtVignette',
+  'grainAmount', 'grainSeedLocked',
+  'levelsInLow', 'levelsInHigh', 'levelsOutLow', 'levelsOutHigh',
+];
+
+function hasCustomEffects(s: ConverterSettings): boolean {
+  if (s.palette.length > 0) return true;
+  return EFFECT_KEYS.some((k) => s[k] !== DEFAULT_SETTINGS[k]);
+}
 
 export function ImageDropzone() {
   const { t } = useTranslation();
@@ -39,7 +62,14 @@ export function ImageDropzone() {
 
         const settings = useConverterStore.getState().settings;
         if (settings.sizeMode === 'absolute') {
-          updateSettings({ width: Math.min(w, settings.width), height: Math.min(h, settings.height) });
+          const fitted = fitDimsToSource({
+            width: settings.width,
+            height: settings.height,
+            lockAspect: settings.lockAspect,
+            sourceWidth: w,
+            sourceHeight: h,
+          });
+          updateSettings(fitted);
         } else {
           updateSettings({ width: 100, height: 100 });
         }
@@ -94,11 +124,33 @@ export function ImageDropzone() {
           const ih = img.naturalHeight;
           setOriginalDimensions(iw, ih);
 
-          const suggested = { ...ex.suggestedSettings };
-          const targetMode = suggested.sizeMode ?? useConverterStore.getState().settings.sizeMode;
+          const currentSettings = useConverterStore.getState().settings;
+          const userHasCustomized = hasCustomEffects(currentSettings);
+
+          // If the user already configured effects (preset applied, sliders moved),
+          // loading an example must only swap the IMAGE — never overwrite their setup.
+          // Examples' suggestedSettings only apply on a clean/default config.
+          let suggested: Partial<ConverterSettings> = userHasCustomized
+            ? {}
+            : { ...ex.suggestedSettings };
+
+          const targetMode = suggested.sizeMode ?? currentSettings.sizeMode;
+          const lockAspect = suggested.lockAspect ?? currentSettings.lockAspect;
+
           if (targetMode === 'absolute') {
-            if (suggested.width !== undefined) suggested.width = Math.min(suggested.width, iw);
-            if (suggested.height !== undefined) suggested.height = Math.min(suggested.height, ih);
+            if (lockAspect) {
+              const fitted = fitDimsToSource({
+                width: currentSettings.width,
+                height: currentSettings.height,
+                lockAspect: true,
+                sourceWidth: iw,
+                sourceHeight: ih,
+              });
+              suggested = { ...suggested, width: fitted.width, height: fitted.height };
+            } else {
+              if (suggested.width !== undefined) suggested.width = Math.min(suggested.width, iw);
+              if (suggested.height !== undefined) suggested.height = Math.min(suggested.height, ih);
+            }
           }
 
           updateSettings(suggested);
