@@ -5,6 +5,7 @@ import { useConverterStore } from '@/store/converterStore';
 import { useImageProcessor } from '@/hooks/useImageProcessor';
 import { useTranslation } from '@/hooks/useTranslation';
 import { exportPNG, loadImage, processFullPipeline, upscaleNearestNeighbor } from '@/lib/imageProcessing';
+import { buildIndexedPng, downloadIndexedPng } from '@/lib/exportIndexedPng';
 import { subscribeCanvas, getResultDimensions } from '@/lib/canvasBus';
 import { onWorkerCrash } from '@/lib/quantizationClient';
 import { Button } from '@/components/ui/button';
@@ -30,7 +31,24 @@ export function AppShell() {
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showBatchExport, setShowBatchExport] = useState(false);
-  const [batchSizes, setBatchSizes] = useState([32, 64, 128, 256]);
+  const [batchSizes, setBatchSizesRaw] = useState<number[]>(() => {
+    try {
+      const raw = localStorage.getItem('psx-batch-sizes');
+      if (!raw) return [32, 64, 128, 256];
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed) && parsed.every((n) => typeof n === 'number')) {
+        return parsed as number[];
+      }
+    } catch { /* ignore */ }
+    return [32, 64, 128, 256];
+  });
+  const setBatchSizes = useCallback((next: number[] | ((prev: number[]) => number[])) => {
+    setBatchSizesRaw((prev) => {
+      const value = typeof next === 'function' ? next(prev) : next;
+      try { localStorage.setItem('psx-batch-sizes', JSON.stringify(value)); } catch { /* private mode */ }
+      return value;
+    });
+  }, []);
   const [isDragOver, setIsDragOver] = useState(false);
   const [batchExporting, setBatchExporting] = useState(false);
   const [pendingReplaceFile, setPendingReplaceFile] = useState<File | null>(null);
@@ -62,6 +80,17 @@ export function AppShell() {
 
   const SCALE_PRESETS = [1, 2, 3, 4, 6, 8, 10, 16];
   const isPresetScale = SCALE_PRESETS.includes(exportScale);
+
+  const EXPORT_PIXEL_LIMIT = 50_000_000;
+
+  const [exportIndexed, setExportIndexedRaw] = useState<boolean>(() => {
+    try { return localStorage.getItem('psx-export-indexed') === 'true'; }
+    catch { return false; }
+  });
+  const setExportIndexed = useCallback((v: boolean) => {
+    setExportIndexedRaw(v);
+    try { localStorage.setItem('psx-export-indexed', String(v)); } catch { /* private mode */ }
+  }, []);
 
   const commitCustomScale = useCallback(() => {
     const n = parseInt(customScaleInput, 10);
@@ -100,18 +129,26 @@ export function AppShell() {
     try {
       const { resultCanvas } = await processFullPipeline(source, settings);
       const targetPixels = resultCanvas.width * resultCanvas.height * exportScale * exportScale;
-      if (targetPixels > 50_000_000) {
+      if (targetPixels > EXPORT_PIXEL_LIMIT) {
         toast.error(t('toast.exportTooLarge'));
         return;
       }
       const finalCanvas = upscaleNearestNeighbor(resultCanvas, exportScale);
-      exportPNG(finalCanvas, getExportFilename(finalCanvas.width, finalCanvas.height));
+      const filename = getExportFilename(finalCanvas.width, finalCanvas.height);
+      const palette = useConverterStore.getState().generatedPalette;
+      const canIndexed = exportIndexed && palette.length > 0 && palette.length <= 256;
+      const ok = canIndexed
+        ? downloadIndexedPng(finalCanvas, palette, filename)
+        : false;
+      if (!ok) {
+        exportPNG(finalCanvas, filename);
+      }
       toast.success(t('toast.exported'));
     } catch (err) {
       console.error('Export failed:', err);
       toast.error(t('toast.processingFailed'));
     }
-  }, [t, getExportFilename, exportScale]);
+  }, [t, getExportFilename, exportScale, exportIndexed]);
 
   const handleCopy = useCallback(async () => {
     const source = useConverterStore.getState().sourceImage;
@@ -124,7 +161,7 @@ export function AppShell() {
       const blobPromise = processFullPipeline(source, settings).then(
         ({ resultCanvas }) => {
           const targetPixels = resultCanvas.width * resultCanvas.height * exportScale * exportScale;
-          if (targetPixels > 50_000_000) {
+          if (targetPixels > EXPORT_PIXEL_LIMIT) {
             throw new Error('export-too-large');
           }
           const finalCanvas = upscaleNearestNeighbor(resultCanvas, exportScale);
@@ -165,15 +202,29 @@ export function AppShell() {
           const batchSettings = { ...settings, width: w, height: h, sizeMode: 'absolute' as const };
           const { resultCanvas } = await processFullPipeline(source, batchSettings);
           const targetPixels = resultCanvas.width * resultCanvas.height * exportScale * exportScale;
-          if (targetPixels > 50_000_000) {
+          if (targetPixels > EXPORT_PIXEL_LIMIT) {
             failedSizes.push(size);
             continue;
           }
           const finalCanvas = upscaleNearestNeighbor(resultCanvas, exportScale);
-          const blob = await new Promise<Blob>((res, rej) =>
-            finalCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
-          );
-          zip.file(getExportFilename(finalCanvas.width, finalCanvas.height), blob);
+          const filename = getExportFilename(finalCanvas.width, finalCanvas.height);
+          const palette = useConverterStore.getState().generatedPalette;
+          const canIndexed = exportIndexed && palette.length > 0 && palette.length <= 256;
+          let payload: Blob | ArrayBuffer;
+          if (canIndexed) {
+            try {
+              payload = buildIndexedPng(finalCanvas, palette);
+            } catch {
+              payload = await new Promise<Blob>((res, rej) =>
+                finalCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
+              );
+            }
+          } else {
+            payload = await new Promise<Blob>((res, rej) =>
+              finalCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
+            );
+          }
+          zip.file(filename, payload);
         } catch (err) {
           console.error(`Batch export failed for size ${size}:`, err);
           failedSizes.push(size);
@@ -203,7 +254,7 @@ export function AppShell() {
       setBatchExporting(false);
       setShowBatchExport(false);
     }
-  }, [batchSizes, getExportFilename, t, exportScale]);
+  }, [batchSizes, getExportFilename, t, exportScale, exportIndexed]);
 
   const loadDroppedFile = useCallback((file: File) => {
     const reader = new FileReader();
@@ -261,6 +312,8 @@ export function AppShell() {
 
   // --- Effects ---
   const [resultDims, setResultDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const exportTooLarge = resultDims.w > 0 &&
+    resultDims.w * resultDims.h * exportScale * exportScale > EXPORT_PIXEL_LIMIT;
   useEffect(() => {
     return subscribeCanvas(() => {
       const { w, h } = getResultDimensions();
@@ -590,8 +643,33 @@ export function AppShell() {
             </div>
           )}
 
-          <Button size="sm" data-tour="export" className="text-[11px] h-7 px-3 bg-primary hover:bg-primary/90"
-            disabled={!hasResult || isProcessing} onClick={handleExport}>
+          {hasResult && (() => {
+            const palette = useConverterStore.getState().generatedPalette;
+            const canIndexed = palette.length > 0 && palette.length <= 256;
+            const tipKey = canIndexed ? 'export.indexedTip' : 'export.indexedDisabled';
+            return (
+              <label
+                className={`flex items-center gap-1 text-[10px] select-none ${canIndexed ? 'text-muted-foreground cursor-pointer' : 'text-muted-foreground/40 cursor-not-allowed'}`}
+                title={t(tipKey)}
+              >
+                <Checkbox
+                  checked={exportIndexed && canIndexed}
+                  disabled={!canIndexed}
+                  onCheckedChange={(v) => setExportIndexed(!!v)}
+                />
+                PNG-8
+              </label>
+            );
+          })()}
+
+          <Button
+            size="sm"
+            data-tour="export"
+            className="text-[11px] h-7 px-3 bg-primary hover:bg-primary/90"
+            disabled={!hasResult || isProcessing || exportTooLarge}
+            onClick={handleExport}
+            title={exportTooLarge ? t('toast.exportTooLarge') : undefined}
+          >
             {t('header.export')}
           </Button>
         </div>

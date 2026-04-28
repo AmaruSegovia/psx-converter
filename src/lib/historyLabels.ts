@@ -41,6 +41,30 @@ export function findChangedKey(from: ConverterSettings, to: ConverterSettings): 
   return null;
 }
 
+/**
+ * Returns which tabs have at least one setting that differs from `defaults`.
+ * Width/height are EXCLUDED from the `sample` tab check because every loaded
+ * image legitimately changes them (matching to source dimensions), so flagging
+ * the tab as "changed" on every load is noise.
+ */
+export function tabsWithChanges(
+  current: ConverterSettings,
+  defaults: ConverterSettings
+): Record<HistoryTab, boolean> {
+  const result: Record<HistoryTab, boolean> = {
+    sample: false, dither: false, palette: false, colors: false, effects: false,
+  };
+  const SAMPLE_IGNORE = new Set(['width', 'height']);
+  for (const [key, tab] of Object.entries(KEY_TO_TAB)) {
+    if (tab === 'sample' && SAMPLE_IGNORE.has(key)) continue;
+    const k = key as keyof ConverterSettings;
+    if (JSON.stringify(current[k]) !== JSON.stringify(defaults[k])) {
+      result[tab] = true;
+    }
+  }
+  return result;
+}
+
 export function formatNumberDiff(prev: number, next: number): string {
   const diff = next - prev;
   const abs = Math.abs(diff);

@@ -19,7 +19,7 @@ export interface ConverterSettings {
   colorCount: number;
   useKMeansPlusPlus: boolean;
   palette: PaletteColor[];
-  paletteSource: 'generated' | 'lospec' | 'builtin' | 'custom';
+  paletteSource: 'generated' | 'lospec' | 'builtin' | 'custom' | 'psx555';
   lospecSlug: string;
 
   // Tab Colors

@@ -97,6 +97,14 @@ export async function quantize(
   opts: QuantizeOpts = {}
 ): Promise<QuantResult> {
   const priority = opts.priority ?? 'full';
+
+  // PSX 555 bypass: hardware emulation is pure per-pixel snap, no clustering
+  // and no dither. Skip the worker entirely — main-thread is fast enough.
+  if (settings.paletteSource === 'psx555') {
+    const { quantizePSX555 } = await import('./quantization');
+    return quantizePSX555(imageData);
+  }
+
   const worker = getWorker();
   if (!worker) {
     const { default: quantizeImage } = await import('./quantization');

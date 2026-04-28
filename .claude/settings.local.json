@@ -34,7 +34,8 @@
       "WebFetch(domain:img2pixel.com)",
       "WebFetch(domain:giventofly.github.io)",
       "WebFetch(domain:captain4lk.itch.io)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(xargs grep *)"
     ]
   }
 }

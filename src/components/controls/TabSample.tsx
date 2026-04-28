@@ -5,68 +5,13 @@ import { InfoTip } from '@/components/ui/info-tip';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EditableValue } from '@/components/ui/editable-value';
+import { ChangedDot } from '@/components/ui/changed-dot';
+import { DEFAULT_SETTINGS } from '@/types';
 
 const sv = (val: number | readonly number[]) => Array.isArray(val) ? val[0] : val;
 
-/** Clickable number that becomes an input on click */
-function EditableValue({
-  value,
-  suffix,
-  min,
-  max,
-  onChange,
-}: {
-  value: number;
-  suffix: string;
-  min: number;
-  max: number;
-  onChange: (v: number) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
-
-  const startEdit = useCallback(() => {
-    setDraft(String(value));
-    setEditing(true);
-  }, [value]);
-
-  const commit = useCallback(() => {
-    setEditing(false);
-    const parsed = parseInt(draft, 10);
-    if (!isNaN(parsed)) {
-      onChange(Math.max(min, Math.min(max, parsed)));
-    }
-  }, [draft, min, max, onChange]);
-
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        type="number"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
-          if (e.key === 'Escape') setEditing(false);
-        }}
-        className="w-16 h-5 text-[11px] text-right bg-muted border border-primary/50 rounded px-1 outline-none text-primary font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-        min={min}
-        max={max}
-      />
-    );
-  }
-
-  return (
-    <button
-      onClick={startEdit}
-      className="text-[11px] text-primary font-mono hover:underline cursor-text tabular-nums"
-      title="Click to edit"
-    >
-      {value}{suffix}
-    </button>
-  );
-}
+const snapPow2 = (n: number) => Math.max(1, 2 ** Math.round(Math.log2(Math.max(1, n))));
 
 /** Lock/unlock aspect ratio icon button */
 function AspectLockButton({ locked, onClick, lockTitle, unlockTitle }: { locked: boolean; onClick: () => void; lockTitle: string; unlockTitle: string }) {
@@ -247,13 +192,28 @@ export function TabSample() {
           <div>
             <div className="flex justify-between items-center mb-1">
               <Label className="text-[11px]">{t('sample.width')}</Label>
-              <EditableValue
-                value={settings.width}
-                suffix={isRelative ? '%' : 'px'}
-                min={1}
-                max={widthMax}
-                onChange={setWidth}
-              />
+              <div className="flex items-center gap-1.5">
+                {!isRelative && (
+                  <button
+                    type="button"
+                    onClick={() => setWidth(snapPow2(settings.width))}
+                    className="text-[9px] text-muted-foreground/50 hover:text-primary transition-colors font-mono px-1"
+                    title={t('sample.snapPow2Tip')}
+                    aria-label={t('sample.snapPow2')}
+                  >
+                    ≈2ⁿ
+                  </button>
+                )}
+                <EditableValue
+                  value={settings.width}
+                  suffix={isRelative ? '%' : 'px'}
+                  min={1}
+                  max={widthMax}
+                  step={1}
+                  onChange={setWidth}
+                  className="text-[11px] text-primary font-mono hover:underline cursor-text tabular-nums"
+                />
+              </div>
             </div>
             <Slider
               value={[settings.width]}
@@ -267,13 +227,28 @@ export function TabSample() {
           <div>
             <div className="flex justify-between items-center mb-1">
               <Label className="text-[11px]">{t('sample.height')}</Label>
-              <EditableValue
-                value={settings.height}
-                suffix={isRelative ? '%' : 'px'}
-                min={1}
-                max={heightMax}
-                onChange={setHeight}
-              />
+              <div className="flex items-center gap-1.5">
+                {!isRelative && (
+                  <button
+                    type="button"
+                    onClick={() => setHeight(snapPow2(settings.height))}
+                    className="text-[9px] text-muted-foreground/50 hover:text-primary transition-colors font-mono px-1"
+                    title={t('sample.snapPow2Tip')}
+                    aria-label={t('sample.snapPow2')}
+                  >
+                    ≈2ⁿ
+                  </button>
+                )}
+                <EditableValue
+                  value={settings.height}
+                  suffix={isRelative ? '%' : 'px'}
+                  min={1}
+                  max={heightMax}
+                  step={1}
+                  onChange={setHeight}
+                  className="text-[11px] text-primary font-mono hover:underline cursor-text tabular-nums"
+                />
+              </div>
             </div>
             <Slider
               value={[settings.height]}
@@ -312,9 +287,20 @@ export function TabSample() {
       </div>
 
       <div>
-        <div className="flex justify-between mb-1">
-          <Label className="text-[11px]">{t('sample.blur')}</Label>
-          <span className="text-[11px] text-muted-foreground">{settings.blurAmount.toFixed(1)}</span>
+        <div className="flex justify-between items-center mb-1">
+          <div className="flex items-center gap-1.5">
+            <ChangedDot show={Math.abs(settings.blurAmount - DEFAULT_SETTINGS.blurAmount) > 0.05} />
+            <Label className="text-[11px]">{t('sample.blur')}</Label>
+          </div>
+          <EditableValue
+            value={settings.blurAmount}
+            min={0}
+            max={5}
+            step={0.1}
+            defaultValue={DEFAULT_SETTINGS.blurAmount}
+            onChange={(v) => updateSettings({ blurAmount: v })}
+            format={(v) => v.toFixed(1)}
+          />
         </div>
         <Slider
           value={[settings.blurAmount]}
@@ -326,9 +312,20 @@ export function TabSample() {
       </div>
 
       <div>
-        <div className="flex justify-between mb-1">
-          <Label className="text-[11px]">{t('sample.sharpen')}</Label>
-          <span className="text-[11px] text-muted-foreground">{settings.sharpenAmount.toFixed(1)}</span>
+        <div className="flex justify-between items-center mb-1">
+          <div className="flex items-center gap-1.5">
+            <ChangedDot show={Math.abs(settings.sharpenAmount - DEFAULT_SETTINGS.sharpenAmount) > 0.05} />
+            <Label className="text-[11px]">{t('sample.sharpen')}</Label>
+          </div>
+          <EditableValue
+            value={settings.sharpenAmount}
+            min={0}
+            max={5}
+            step={0.1}
+            defaultValue={DEFAULT_SETTINGS.sharpenAmount}
+            onChange={(v) => updateSettings({ sharpenAmount: v })}
+            format={(v) => v.toFixed(1)}
+          />
         </div>
         <Slider
           value={[settings.sharpenAmount]}

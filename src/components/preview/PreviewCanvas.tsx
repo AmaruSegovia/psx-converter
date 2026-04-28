@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useConverterStore } from '@/store/converterStore';
 import { subscribeCanvas, getResultCanvas, getResultDimensions } from '@/lib/canvasBus';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -28,6 +29,47 @@ export function PreviewCanvas({ bg = 'checkerboard', bgColor = '#1a1525', bgImag
   const [dims, setDims] = useState({ w: 0, h: 0 });
   const [showGrid, setShowGrid] = useState(false);
   const [showTile, setShowTile] = useState(false);
+  const [swapped, setSwappedRaw] = useState<boolean>(() => {
+    try { return localStorage.getItem('psx-preview-swapped') === 'true'; }
+    catch { return false; }
+  });
+  const setSwapped = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
+    setSwappedRaw((prev) => {
+      const value = typeof next === 'function' ? next(prev) : next;
+      try { localStorage.setItem('psx-preview-swapped', String(value)); } catch { /* private mode */ }
+      return value;
+    });
+  }, []);
+  const [inspectorEnabled, setInspectorEnabledRaw] = useState<boolean>(() => {
+    try { return localStorage.getItem('psx-pixel-inspector') === 'true'; }
+    catch { return false; }
+  });
+  const setInspectorEnabled = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
+    setInspectorEnabledRaw((prev) => {
+      const value = typeof next === 'function' ? next(prev) : next;
+      try { localStorage.setItem('psx-pixel-inspector', String(value)); } catch { /* private mode */ }
+      return value;
+    });
+  }, []);
+  type InspectorState = {
+    visible: boolean;
+    cursorX: number;
+    cursorY: number;
+    x: number;
+    y: number;
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+    hex: string;
+    paletteIdx: number;
+  };
+  const [inspector, setInspector] = useState<InspectorState>({
+    visible: false, cursorX: 0, cursorY: 0,
+    x: 0, y: 0, r: 0, g: 0, b: 0, a: 0,
+    hex: '#000000', paletteIdx: -1,
+  });
+  const inspectorRafRef = useRef<number | null>(null);
   const dragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
   const prevDims = useRef({ w: 0, h: 0 });
@@ -263,6 +305,69 @@ export function PreviewCanvas({ bg = 'checkerboard', bgColor = '#1a1525', bgImag
     setPan({ x: 0, y: 0 });
   }, [fitZoom]);
 
+  // Pixel inspector: map cursor → source pixel, read RGB, find palette index.
+  // Throttled to 1 sample per frame to keep getImageData cheap.
+  const handleInspectorMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!inspectorEnabled) return;
+    const container = containerRef.current;
+    const src = getResultCanvas();
+    if (!container || !src) return;
+    const rect = container.getBoundingClientRect();
+    const cursorX = e.clientX - rect.left;
+    const cursorY = e.clientY - rect.top;
+    if (inspectorRafRef.current !== null) return;
+    inspectorRafRef.current = requestAnimationFrame(() => {
+      inspectorRafRef.current = null;
+      const cw = rect.width;
+      const ch = rect.height;
+      // Display canvas is centered: top-1/2 left-1/2 + translate(-50% + pan, ...).
+      // Display visual size = src.width * zoom (single tile mode) or src.width * TILE_COUNT * zoom.
+      const tile = showTileRef.current ? TILE_COUNT : 1;
+      const dispW = src.width * tile * zoom;
+      const dispH = src.height * tile * zoom;
+      const left = cw / 2 + pan.x - dispW / 2;
+      const top = ch / 2 + pan.y - dispH / 2;
+      const dx = cursorX - left;
+      const dy = cursorY - top;
+      let sx = Math.floor(dx / zoom);
+      let sy = Math.floor(dy / zoom);
+      // Tile mode: cursor on any of 3×3 repeats → sample the corresponding source pixel
+      if (tile > 1) {
+        sx = ((sx % src.width) + src.width) % src.width;
+        sy = ((sy % src.height) + src.height) % src.height;
+      }
+      if (sx < 0 || sy < 0 || sx >= src.width || sy >= src.height) {
+        setInspector((s) => s.visible ? { ...s, visible: false } : s);
+        return;
+      }
+      try {
+        const ctx = src.getContext('2d');
+        if (!ctx) return;
+        const px = ctx.getImageData(sx, sy, 1, 1).data;
+        const r = px[0], g = px[1], b = px[2], a = px[3];
+        const hex = '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+        const palette = useConverterStore.getState().generatedPalette;
+        const paletteIdx = palette.findIndex((p) => p.r === r && p.g === g && p.b === b);
+        setInspector({ visible: true, cursorX, cursorY, x: sx, y: sy, r, g, b, a, hex, paletteIdx });
+      } catch {
+        // getImageData can throw on tainted canvases; bail silently.
+      }
+    });
+  }, [inspectorEnabled, zoom, pan]);
+
+  const handleInspectorLeave = useCallback(() => {
+    if (inspectorRafRef.current !== null) {
+      cancelAnimationFrame(inspectorRafRef.current);
+      inspectorRafRef.current = null;
+    }
+    setInspector((s) => s.visible ? { ...s, visible: false } : s);
+  }, []);
+
+  // Reset overlay when toggle turns off.
+  useEffect(() => {
+    if (!inspectorEnabled) handleInspectorLeave();
+  }, [inspectorEnabled, handleInspectorLeave]);
+
   if (!sourceImage) return null;
 
   const resultLabel = dims.w && dims.h ? `${t('preview.result')} (${dims.w}×${dims.h})` : t('preview.result');
@@ -286,9 +391,13 @@ export function PreviewCanvas({ bg = 'checkerboard', bgColor = '#1a1525', bgImag
 
   return (
     <div className={`absolute inset-0 flex items-center justify-center ${bgClass}`} style={bgStyle}>
-      <div className="flex gap-6 items-center justify-center p-6 w-full h-full">
+      <div className={`flex gap-6 items-center justify-center p-6 w-full h-full ${swapped ? 'flex-row-reverse' : ''}`}>
         {/* Source */}
-        <div className="flex flex-col items-center gap-2 flex-1 h-full justify-center overflow-hidden">
+        <motion.div
+          layout
+          transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+          className="flex flex-col items-center gap-2 flex-1 h-full justify-center overflow-hidden"
+        >
           <span className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-medium shrink-0">
             {t('preview.original')}
           </span>
@@ -298,12 +407,34 @@ export function PreviewCanvas({ bg = 'checkerboard', bgColor = '#1a1525', bgImag
             className="max-w-full max-h-[calc(100%-24px)] object-contain drop-shadow-2xl"
             style={{ imageRendering: 'pixelated' }}
           />
-        </div>
+        </motion.div>
 
-        <div className="w-px h-2/3 bg-border/30 shrink-0" />
+        <button
+          type="button"
+          onClick={() => setSwapped((s) => !s)}
+          className="relative w-px h-2/3 bg-border/30 shrink-0 group flex items-center justify-center"
+          title={t('preview.swapPanels')}
+          aria-label={t('preview.swapPanels')}
+        >
+          <span className="absolute w-7 h-7 rounded-full bg-card border border-border/60 flex items-center justify-center opacity-60 group-hover:opacity-100 group-hover:border-primary/50 transition-all">
+            <svg
+              className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-180"
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+            >
+              <path d="M7 4L4 7l3 3" />
+              <path d="M4 7h16" />
+              <path d="M17 20l3-3-3-3" />
+              <path d="M20 17H4" />
+            </svg>
+          </span>
+        </button>
 
         {/* Result */}
-        <div className="flex flex-col items-center gap-2 flex-1 h-full justify-center overflow-hidden">
+        <motion.div
+          layout
+          transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+          className="flex flex-col items-center gap-2 flex-1 h-full justify-center overflow-hidden"
+        >
           <div className="flex items-center gap-1.5 shrink-0">
             <span className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-medium">
               {isProcessing ? t('preview.processing') : resultLabel}
@@ -332,6 +463,23 @@ export function PreviewCanvas({ bg = 'checkerboard', bgColor = '#1a1525', bgImag
                     <rect x="6.65" y="0.65" width="4.7" height="4.7" />
                     <rect x="0.65" y="6.65" width="4.7" height="4.7" />
                     <rect x="6.65" y="6.65" width="4.7" height="4.7" />
+                  </svg>
+                </button>
+                {/* Pixel inspector toggle */}
+                <button
+                  onClick={() => setInspectorEnabled((v) => !v)}
+                  className={`w-5 h-5 flex items-center justify-center rounded border transition-colors ${
+                    inspectorEnabled
+                      ? 'border-primary/70 text-primary bg-primary/10'
+                      : 'border-border/40 text-muted-foreground/35 hover:text-muted-foreground/70 hover:border-border/70'
+                  }`}
+                  title={t('preview.inspectorTitle')}
+                  aria-label={t('preview.inspectorTitle')}
+                  aria-pressed={inspectorEnabled}
+                >
+                  <svg aria-hidden="true" focusable="false" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+                    <circle cx="12" cy="12" r="3" />
                   </svg>
                 </button>
                 {/* Tile mode toggle */}
@@ -363,12 +511,13 @@ export function PreviewCanvas({ bg = 'checkerboard', bgColor = '#1a1525', bgImag
           </div>
           <div
             ref={containerRef}
-            className={`overflow-hidden flex-1 w-full relative ${canPan ? 'cursor-grab active:cursor-grabbing' : ''}`}
+            className={`overflow-hidden flex-1 w-full relative ${inspectorEnabled ? 'cursor-crosshair' : canPan ? 'cursor-grab active:cursor-grabbing' : ''}`}
             style={{ touchAction: 'none' }}
             onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
+            onPointerMove={(e) => { handlePointerMove(e); handleInspectorMove(e); }}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
+            onPointerLeave={handleInspectorLeave}
             onDoubleClick={handleDoubleClick}
           >
             <canvas
@@ -386,8 +535,45 @@ export function PreviewCanvas({ bg = 'checkerboard', bgColor = '#1a1525', bgImag
               className="absolute inset-0 pointer-events-none"
               style={{ width: '100%', height: '100%' }}
             />
+            <AnimatePresence>
+              {inspectorEnabled && inspector.visible && (() => {
+                // Flip overlay to opposite quadrant near container edges so it
+                // never spills outside the panel.
+                const cw = containerRef.current?.clientWidth ?? 0;
+                const ch = containerRef.current?.clientHeight ?? 0;
+                const flipRight = inspector.cursorX > cw - 140;
+                const flipBottom = inspector.cursorY > ch - 80;
+                const style: React.CSSProperties = {
+                  left: flipRight ? undefined : inspector.cursorX + 12,
+                  right: flipRight ? cw - inspector.cursorX + 12 : undefined,
+                  top: flipBottom ? undefined : inspector.cursorY + 12,
+                  bottom: flipBottom ? ch - inspector.cursorY + 12 : undefined,
+                };
+                return (
+                  <motion.div
+                    key="inspector-overlay"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.12 }}
+                    className="absolute pointer-events-none bg-card/95 border border-border rounded px-2 py-1 text-[10px] font-mono shadow-lg backdrop-blur-sm space-y-0.5"
+                    style={style}
+                  >
+                    <div className="text-muted-foreground/70">{inspector.x},{inspector.y}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm border border-border" style={{ backgroundColor: inspector.hex }} />
+                      <span>{inspector.hex}</span>
+                    </div>
+                    <div className="text-muted-foreground/70">rgb({inspector.r}, {inspector.g}, {inspector.b}){inspector.a < 255 ? ` · α${inspector.a}` : ''}</div>
+                    {inspector.paletteIdx >= 0 && (
+                      <div className="text-muted-foreground/50">#{inspector.paletteIdx}</div>
+                    )}
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

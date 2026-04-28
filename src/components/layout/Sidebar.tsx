@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
 import { toast } from 'sonner';
+import { ChangedDot } from '@/components/ui/changed-dot';
 import { useConverterStore } from '@/store/converterStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,6 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { HoverTooltip } from '@/components/ui/hover-tooltip';
 import { buildShareUrl } from '@/lib/shareLink';
+import { tabsWithChanges } from '@/lib/historyLabels';
+import { DEFAULT_SETTINGS } from '@/types';
 import { TabSample } from '@/components/controls/TabSample';
 import { TabDither } from '@/components/controls/TabDither';
 // Palette tab carries react-colorful — lazy-load to shrink initial bundle.
@@ -24,11 +27,15 @@ interface SidebarProps {
   onMobileClose?: () => void;
 }
 
+const TAB_DOT_CLASSNAME = 'absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-primary';
+
 export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = {}) {
   const { t } = useTranslation();
   const activeTab = useConverterStore((s) => s.activeTab);
   const setActiveTab = useConverterStore((s) => s.setActiveTab);
+  const settings = useConverterStore((s) => s.settings);
   const resetSettings = useConverterStore((s) => s.resetSettings);
+  const changedTabs = tabsWithChanges(settings, DEFAULT_SETTINGS);
   const { undo, redo, historyIndex, historyLength, navigateHistory, clearHistory, getEntryLabel } = useUndoRedo();
   const currentLabel = historyIndex >= 0 ? getEntryLabel(historyIndex) : '';
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -167,25 +174,30 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
         className="flex flex-col flex-1 overflow-hidden"
       >
         <TabsList className="grid grid-cols-5 mx-4 mt-3 bg-muted/50 h-9">
-          <TabsTrigger value="sample" className="text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1">
+          <TabsTrigger value="sample" className="relative text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary pl-1 pr-3">
             <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 15l6-6 4 4 8-8" /></svg>
             {t('tab.resize')}
+            <ChangedDot show={changedTabs.sample} className={TAB_DOT_CLASSNAME} />
           </TabsTrigger>
-          <TabsTrigger value="dither" className="text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1">
+          <TabsTrigger value="dither" className="relative text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary pl-1 pr-3">
             <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="6" cy="6" r="1.5" /><circle cx="18" cy="6" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="6" cy="18" r="1.5" /><circle cx="18" cy="18" r="1.5" /></svg>
             {t('tab.dither')}
+            <ChangedDot show={changedTabs.dither} className={TAB_DOT_CLASSNAME} />
           </TabsTrigger>
-          <TabsTrigger value="palette" className="text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1">
+          <TabsTrigger value="palette" className="relative text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary pl-1 pr-3">
             <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="8" r="2" /><circle cx="8" cy="14" r="2" /><circle cx="16" cy="14" r="2" /></svg>
             {t('tab.palette')}
+            <ChangedDot show={changedTabs.palette} className={TAB_DOT_CLASSNAME} />
           </TabsTrigger>
-          <TabsTrigger value="colors" className="text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1">
+          <TabsTrigger value="colors" className="relative text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary pl-1 pr-3">
             <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><path d="M12 2v20M2 12h20" /><path d="M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" /></svg>
             {t('tab.colors')}
+            <ChangedDot show={changedTabs.colors} className={TAB_DOT_CLASSNAME} />
           </TabsTrigger>
-          <TabsTrigger value="effects" className="text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1">
+          <TabsTrigger value="effects" className="relative text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary pl-1 pr-3">
             <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" /><path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75z" /><path d="M5 17l.5 1.5L7 19l-1.5.5L5 21l-.5-1.5L3 19l1.5-.5z" /></svg>
             {t('tab.effects')}
+            <ChangedDot show={changedTabs.effects} className={TAB_DOT_CLASSNAME} />
           </TabsTrigger>
         </TabsList>
 

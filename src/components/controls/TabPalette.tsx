@@ -26,6 +26,7 @@ export function TabPalette() {
   const settings = useConverterStore((s) => s.settings);
   const updateSettings = useConverterStore((s) => s.updateSettings);
   const generatedPalette = useConverterStore((s) => s.generatedPalette);
+  const setGeneratedPalette = useConverterStore((s) => s.setGeneratedPalette);
   const { fetchPalette, loading: lospecLoading, errorCode: lospecErrorCode } = useLospecAPI();
   const [lospecSlug, setLospecSlug] = useState(settings.lospecSlug);
   const [selectedColorIdx, setSelectedColorIdx] = useState<number | null>(null);
@@ -503,6 +504,41 @@ export function TabPalette() {
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* PSX 555 hardware mode */}
+      <div className="space-y-2 pt-2 border-t border-border">
+        <div className="flex items-center gap-1.5">
+          <Label className="text-[11px]">{t('palette.hardware')}</Label>
+          <InfoTip text={t('palette.psx555Tip')} />
+        </div>
+        <Button
+          size="sm"
+          variant={settings.paletteSource === 'psx555' ? 'default' : 'outline'}
+          className="text-[11px] w-full h-9"
+          onClick={() => {
+            // Clear the displayed palette so users don't see stale colors
+            // (PSX 555 emits hundreds-thousands of unique 5-bit colors that
+            // would linger until the next full pipeline tick — ~400ms).
+            setGeneratedPalette([]);
+            if (settings.paletteSource === 'psx555') {
+              updateSettings({ paletteSource: 'generated' });
+            } else {
+              updateSettings({
+                paletteSource: 'psx555',
+                palette: [],
+                lospecSlug: '',
+              });
+              setSelectedColorIdx(null);
+            }
+          }}
+          aria-pressed={settings.paletteSource === 'psx555'}
+        >
+          {settings.paletteSource === 'psx555' ? t('palette.psx555Disable') : t('palette.psx555')}
+        </Button>
+        {settings.paletteSource === 'psx555' && (
+          <p className="text-[10px] text-muted-foreground/70">{t('palette.psx555Hint')}</p>
+        )}
       </div>
     </div>
   );

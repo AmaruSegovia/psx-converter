@@ -2,6 +2,8 @@ import { useConverterStore } from '@/store/converterStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { EditableValue } from '@/components/ui/editable-value';
+import { ChangedDot } from '@/components/ui/changed-dot';
 import { DEFAULT_SETTINGS } from '@/types';
 
 interface SliderControlProps {
@@ -22,16 +24,18 @@ function SliderControl({ label, value, defaultValue, onChange, min, max, step, f
     <div>
       <div className="flex justify-between items-center mb-1.5">
         <div className="flex items-center gap-1.5">
-          {isChanged && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+          <ChangedDot show={isChanged} />
           <Label className="text-[11px]">{label}</Label>
         </div>
-        <button
-          className="text-[11px] text-muted-foreground font-mono tabular-nums hover:text-primary transition-colors"
-          onClick={() => onChange(defaultValue)}
-          title="Double-click to reset"
-        >
-          {format ? format(value) : value.toFixed(2)}
-        </button>
+        <EditableValue
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          defaultValue={defaultValue}
+          onChange={onChange}
+          format={format ?? ((v) => v.toFixed(2))}
+        />
       </div>
       <Slider
         value={[value]}

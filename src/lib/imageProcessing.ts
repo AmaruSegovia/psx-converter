@@ -320,10 +320,6 @@ function computePixelHash(canvas: HTMLCanvasElement): string {
   return `${canvas.width}x${canvas.height}-${h.toString(16)}`;
 }
 
-export function getSourceHash(): string {
-  return _cachedHash;
-}
-
 function capCanvas(canvas: HTMLCanvasElement, maxDim: number): HTMLCanvasElement {
   if (canvas.width <= maxDim && canvas.height <= maxDim) return canvas;
   const scale = maxDim / Math.max(canvas.width, canvas.height);
@@ -524,7 +520,7 @@ function quantSignature(sourceHash: string, s: ConverterSettings): string {
       ? (s.grainSeedLocked ? `seed:${s.grainSeed}` : `seed:rand:${Math.random()}`)
       : 'seed:none',
     s.colorCount, s.ditherMode, s.ditherAmount, s.distanceMetric,
-    s.useKMeansPlusPlus, palette,
+    s.useKMeansPlusPlus, palette, s.paletteSource,
   ].join('|');
 }
 

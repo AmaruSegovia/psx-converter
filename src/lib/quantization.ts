@@ -62,6 +62,39 @@ function createPaletteFromColors(colors: PaletteColor[]): iq.utils.Palette {
   return palette;
 }
 
+/**
+ * PSX 555 hardware emulation: snaps each RGB channel to 5 bits (32 levels:
+ * 0, 8, 16, …, 248). Mutates the buffer in place. Returns the same ImageData
+ * plus a deduped palette of every snapped color found. No dither, no clustering.
+ *
+ * Bit-trick `(v >> 3) << 3` is equivalent to `Math.floor(v / 8) * 8` and matches
+ * how the actual PS1 GPU truncates colors.
+ */
+export function quantizePSX555(imageData: ImageData): {
+  imageData: ImageData;
+  generatedPalette: PaletteColor[];
+} {
+  const data = imageData.data;
+  const seen = new Set<number>();
+  const palette: PaletteColor[] = [];
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    const r = (data[i]     >> 3) << 3;
+    const g = (data[i + 1] >> 3) << 3;
+    const b = (data[i + 2] >> 3) << 3;
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+    const key = (r << 16) | (g << 8) | b;
+    if (!seen.has(key)) {
+      seen.add(key);
+      const hex = '#' + r.toString(16).padStart(2, '0') + g.toString(16).padStart(2, '0') + b.toString(16).padStart(2, '0');
+      palette.push({ r, g, b, hex });
+    }
+  }
+  return { imageData, generatedPalette: palette };
+}
+
 export function extractUniqueColors(imageData: ImageData): PaletteColor[] {
   const seen = new Set<number>();
   const colors: PaletteColor[] = [];

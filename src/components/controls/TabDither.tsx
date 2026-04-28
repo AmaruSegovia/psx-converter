@@ -4,6 +4,8 @@ import { InfoTip } from '@/components/ui/info-tip';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EditableValue } from '@/components/ui/editable-value';
+import { ChangedDot } from '@/components/ui/changed-dot';
 import { DEFAULT_SETTINGS } from '@/types';
 
 const sv = (val: number | readonly number[]) => Array.isArray(val) ? val[0] : val;
@@ -40,13 +42,17 @@ export function TabDither() {
         <div>
           <div className="flex justify-between items-center mb-1.5">
             <div className="flex items-center gap-1.5">
-              {alphaChanged && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+              <ChangedDot show={alphaChanged} />
               <Label className="text-[11px]">{t('dither.alphaThreshold')}</Label>
             </div>
-            <button className="text-[11px] text-muted-foreground font-mono tabular-nums hover:text-primary transition-colors"
-              onClick={() => updateSettings({ alphaThreshold: d.alphaThreshold })}>
-              {settings.alphaThreshold}
-            </button>
+            <EditableValue
+              value={settings.alphaThreshold}
+              min={0}
+              max={255}
+              step={1}
+              defaultValue={d.alphaThreshold}
+              onChange={(v) => updateSettings({ alphaThreshold: v })}
+            />
           </div>
           <Slider value={[settings.alphaThreshold]} onValueChange={(val) => updateSettings({ alphaThreshold: sv(val) })}
             min={0} max={255} step={1} />
@@ -115,13 +121,18 @@ export function TabDither() {
       <div>
         <div className="flex justify-between items-center mb-1.5">
           <div className="flex items-center gap-1.5">
-            {ditherAmtChanged && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+            <ChangedDot show={ditherAmtChanged} />
             <Label className="text-[11px]">{t('dither.amount')}</Label>
           </div>
-          <button className="text-[11px] text-muted-foreground font-mono tabular-nums hover:text-primary transition-colors"
-            onClick={() => updateSettings({ ditherAmount: d.ditherAmount })}>
-            {settings.ditherAmount.toFixed(2)}
-          </button>
+          <EditableValue
+            value={settings.ditherAmount}
+            min={0}
+            max={1}
+            step={0.01}
+            defaultValue={d.ditherAmount}
+            onChange={(v) => updateSettings({ ditherAmount: v })}
+            format={(v) => v.toFixed(2)}
+          />
         </div>
         <Slider value={[settings.ditherAmount]} onValueChange={(val) => updateSettings({ ditherAmount: sv(val) })}
           min={0} max={1} step={0.01} />
