@@ -4,7 +4,7 @@ export const EXAMPLE_IMAGES: ExampleImage[] = [
   {
     id: 'ejemplo1',
     name: 'Ejemplo 1',
-    filename: 'Ejemplo1.png',
+    filename: 'Ejemplo1.jpg',
     suggestedSettings: {
       width: 64,
       height: 64,
@@ -17,7 +17,7 @@ export const EXAMPLE_IMAGES: ExampleImage[] = [
   {
     id: 'ejemplo2',
     name: 'Ejemplo 2',
-    filename: 'Ejemplo2.jpeg',
+    filename: 'Ejemplo2.jfif',
     suggestedSettings: {
       width: 128,
       height: 128,
@@ -31,7 +31,7 @@ export const EXAMPLE_IMAGES: ExampleImage[] = [
   {
     id: 'ejemplo3',
     name: 'Ejemplo 3',
-    filename: 'Ejemplo3.jpg',
+    filename: 'Ejemplo3.jfif',
     suggestedSettings: {
       width: 64,
       height: 64,
@@ -44,7 +44,7 @@ export const EXAMPLE_IMAGES: ExampleImage[] = [
   {
     id: 'ejemplo4',
     name: 'Ejemplo 4',
-    filename: 'Ejemplo4.jpg',
+    filename: 'Ejemplo4.jpeg',
     suggestedSettings: {
       width: 64,
       height: 64,
