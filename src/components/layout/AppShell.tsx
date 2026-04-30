@@ -20,6 +20,7 @@ import { BeforeAfterSlider } from '@/components/preview/BeforeAfterSlider';
 import { FACTORY_PRESETS } from '@/data/factoryPresets';
 import { setPendingHistoryLabel } from '@/hooks/useUndoRedo';
 import { pulseDonate } from '@/components/donate/donateState';
+import { setHeaderStatus, subscribeHeaderStatus } from '@/lib/headerStatus';
 import type { ConverterSettings } from '@/types';
 
 export function AppShell() {
@@ -56,6 +57,17 @@ export function AppShell() {
   const [pendingReplaceFile, setPendingReplaceFile] = useState<File | null>(null);
   const [paletteChoice, setPaletteChoice] = useState<'keep' | 'regen'>('keep');
   const [restorePrompt, setRestorePrompt] = useState<{ blob: Blob; fileName: string } | null>(null);
+  const [headerMsg, setHeaderMsg] = useState<{ text: string; type: 'success' | 'warning' } | null>(null);
+  const headerTimerRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const unsub = subscribeHeaderStatus((msg, type) => {
+      window.clearTimeout(headerTimerRef.current);
+      setHeaderMsg({ text: msg, type });
+      headerTimerRef.current = window.setTimeout(() => setHeaderMsg(null), 2800);
+    }, () => setHeaderMsg(null));
+    return () => { unsub(); window.clearTimeout(headerTimerRef.current); };
+  }, []);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [previewBg, setPreviewBg] = useState<'checkerboard' | 'black' | 'white' | 'custom' | 'image'>('checkerboard');
   const [previewBgCustom, setPreviewBgCustom] = useState<string>('#1a1525');
@@ -117,7 +129,7 @@ export function AppShell() {
     import('@/lib/sourceStorage').then((m) => m.clearSource());
     setShowRemoveDialog(false);
     setHasResult(false);
-    toast.success(t('toast.imageRemoved'));
+    setHeaderStatus(t('toast.imageRemoved'));
   };
 
   // Export ALWAYS runs the full pipeline so output matches the final preview
@@ -145,7 +157,7 @@ export function AppShell() {
       if (!ok) {
         exportPNG(finalCanvas, filename);
       }
-      toast.success(t('toast.exported'));
+      setHeaderStatus(t('toast.exported'));
       setTimeout(pulseDonate, 5000);
     } catch (err) {
       console.error('Export failed:', err);
@@ -174,7 +186,7 @@ export function AppShell() {
         }
       );
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
-      toast.success(t('toast.copied'));
+      setHeaderStatus(t('toast.copied'));
     } catch (err) {
       console.error('Copy failed:', err);
       if (err instanceof Error && err.message === 'export-too-large') {
@@ -246,9 +258,9 @@ export function AppShell() {
       a.click();
       URL.revokeObjectURL(url);
       if (failedSizes.length > 0) {
-        toast.warning(`${t('toast.zipExported')} — ${t('toast.zipSkipped')}: ${failedSizes.join(', ')}`);
+        setHeaderStatus(`${t('toast.zipExported')} — ${t('toast.zipSkipped')}: ${failedSizes.join(', ')}`, 'warning');
       } else {
-        toast.success(t('toast.zipExported'));
+        setHeaderStatus(t('toast.zipExported'));
       }
     } catch (err) {
       console.error('Batch export failed:', err);
@@ -290,7 +302,7 @@ export function AppShell() {
           store.updateSettings({ width: 100, height: 100 });
         }
         // Relative + unlocked: keep user's percentages as-is.
-        toast.success(`${t('toast.imageLoaded')} (${img.naturalWidth} x ${img.naturalHeight}px)`);
+        setHeaderStatus(`${t('toast.imageLoaded')} (${img.naturalWidth} x ${img.naturalHeight}px)`);
       } catch {
         toast.error(t('dropzone.loadError'));
       }
@@ -474,7 +486,7 @@ export function AppShell() {
         setPendingHistoryLabel(`Preset: ${preset.name}`);
         const next: ConverterSettings = { ...preset.settings, width: w, height: h, sizeMode: 'absolute' };
         store.loadSettings(next);
-        toast.success(t('toast.presetLoaded', { name: preset.name }));
+        setHeaderStatus(t('toast.presetLoaded', { name: preset.name }));
       }
       if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
         e.preventDefault();
@@ -536,13 +548,25 @@ export function AppShell() {
         </div>
 
         <div className="flex items-center gap-1.5">
-          {isProcessing && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <div className="w-3 h-3 border-[1.5px] border-primary border-t-transparent rounded-full animate-spin" />
-              {t('header.processing')}
-            </motion.div>
-          )}
+          <AnimatePresence mode="wait">
+            {isProcessing ? (
+              <motion.div key="processing"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className="w-3 h-3 border-[1.5px] border-primary border-t-transparent rounded-full animate-spin" />
+                {t('header.processing')}
+              </motion.div>
+            ) : headerMsg ? (
+              <motion.span key={headerMsg.text}
+                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18 }}
+                className={`text-[11px] ${headerMsg.type === 'warning' ? 'text-amber-400/80' : 'text-muted-foreground/70'}`}
+              >
+                {headerMsg.text}
+              </motion.span>
+            ) : null}
+          </AnimatePresence>
 
           {sourceImage && (
             <Button size="sm" variant="ghost" className="text-[11px] h-7 px-2 gap-1 text-muted-foreground hover:text-destructive"

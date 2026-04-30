@@ -22,6 +22,7 @@ import { TabEffects } from '@/components/controls/TabEffects';
 import { PresetSaveDialog, PresetLoadDialog } from '@/components/presets/PresetManager';
 import { CAFECITO_URL } from '@/components/donate/DonateButton';
 import { subscribeDonatePulse } from '@/components/donate/donateState';
+import { setHeaderStatus } from '@/lib/headerStatus';
 import { useUndoRedo, setPendingHistoryLabel } from '@/hooks/useUndoRedo';
 
 interface SidebarProps {
@@ -61,7 +62,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
   const handleResetConfirm = () => {
     setPendingHistoryLabel('Reset');
     resetSettings();
-    toast.success(t('toast.settingsReset'));
+    setHeaderStatus(t('toast.settingsReset'));
     setShowResetConfirm(false);
   };
 
@@ -99,8 +100,8 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
               const url = buildShareUrl(settings);
               try {
                 await navigator.clipboard.writeText(url);
-                if (url.length > 2000) toast.warning(t('toast.linkTooLong'));
-                else toast.success(t('toast.linkCopied'));
+                if (url.length > 2000) setHeaderStatus(t('toast.linkTooLong'), 'warning');
+                else setHeaderStatus(t('toast.linkCopied'));
               } catch {
                 toast.error(t('toast.copyFailed'));
               }

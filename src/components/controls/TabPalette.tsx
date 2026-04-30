@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { setHeaderStatus } from '@/lib/headerStatus';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useConverterStore } from '@/store/converterStore';
 import { useLospecAPI } from '@/hooks/useLospecAPI';
@@ -73,7 +74,7 @@ export function TabPalette() {
         lospecSlug,
         colorCount: colors.length,
       });
-      toast.success(t('toast.lospecImported', { count: colors.length }));
+      setHeaderStatus(t('toast.lospecImported', { count: colors.length }));
     }
   }, [lospecSlug, fetchPalette, updateSettings, t]);
 
@@ -87,7 +88,7 @@ export function TabPalette() {
         paletteSource: 'builtin',
         colorCount: colors.length,
       });
-      toast.success(t('toast.presetLoaded', { name: pal.name }));
+      setHeaderStatus(t('toast.presetLoaded', { name: pal.name }));
     }
   }, [updateSettings, t]);
 
@@ -129,7 +130,7 @@ export function TabPalette() {
         const newPalette = [...settings.palette];
         newPalette[selectedColorIdx] = color;
         updateSettings({ palette: newPalette });
-        toast.success(t('toast.colorPicked', { hex: color.hex }));
+        setHeaderStatus(t('toast.colorPicked', { hex: color.hex }));
       } else {
         // Add to palette (promotes from generated if needed)
         updateSettings({
@@ -137,7 +138,7 @@ export function TabPalette() {
           paletteSource: 'custom',
           colorCount: base.length + 1,
         });
-        toast.success(t('toast.colorAdded', { hex: color.hex }));
+        setHeaderStatus(t('toast.colorAdded', { hex: color.hex }));
       }
     } catch {
       // User cancelled
@@ -161,7 +162,7 @@ export function TabPalette() {
             paletteSource: 'custom',
             colorCount: colors.length,
           });
-          toast.success(t('toast.fileImported', { count: colors.length }));
+          setHeaderStatus(t('toast.fileImported', { count: colors.length }));
         } else {
           toast.error(t('toast.noColors'));
         }
@@ -307,7 +308,7 @@ export function TabPalette() {
                 variant="outline"
                 onClick={() => {
                   exportPaletteHex(displayPalette);
-                  toast.success(t('toast.paletteExported'));
+                  setHeaderStatus(t('toast.paletteExported'));
                   setExportDialogOpen(false);
                 }}
               >
@@ -317,7 +318,7 @@ export function TabPalette() {
                 variant="outline"
                 onClick={() => {
                   exportPaletteGPL(displayPalette, 'PSX');
-                  toast.success(t('toast.paletteExported'));
+                  setHeaderStatus(t('toast.paletteExported'));
                   setExportDialogOpen(false);
                 }}
               >
@@ -327,7 +328,7 @@ export function TabPalette() {
                 variant="outline"
                 onClick={() => {
                   exportPaletteJSON(displayPalette);
-                  toast.success(t('toast.paletteExported'));
+                  setHeaderStatus(t('toast.paletteExported'));
                   setExportDialogOpen(false);
                 }}
               >
