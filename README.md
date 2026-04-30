@@ -10,12 +10,7 @@ Convertí cualquier imagen en una **textura pixel art estilo PlayStation 1** dir
 
 **→ Probalo online gratis: [amarusegovia.github.io/psx-converter](https://amarusegovia.github.io/psx-converter/)**
 
-<!--
-  SCREENSHOT: pegá tu captura en `docs/hero.png` (o `docs/hero.gif` si querés animación).
-  Sugerido: 1280×720, app abierta con una imagen procesada y el slider Compare visible.
-  Después descomentá la línea de abajo:
--->
-<!-- ![PSX Converter — preview](./docs/hero.png) -->
+![PSX Converter — preview](./docs/preview.gif)
 
 > [!TIP]
 > **Instalable como PWA** — primera carga la cachea y después funciona offline. No tenés que instalar nada, pero podés "Add to Home Screen" en Chromium para que quede como app nativa.
