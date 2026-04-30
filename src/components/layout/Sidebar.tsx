@@ -20,7 +20,7 @@ const TabPalette = lazy(() =>
 import { TabColors } from '@/components/controls/TabColors';
 import { TabEffects } from '@/components/controls/TabEffects';
 import { PresetSaveDialog, PresetLoadDialog } from '@/components/presets/PresetManager';
-import { DonateButton, CAFECITO_URL } from '@/components/donate/DonateButton';
+import { CAFECITO_URL } from '@/components/donate/DonateButton';
 import { useUndoRedo, setPendingHistoryLabel } from '@/hooks/useUndoRedo';
 
 interface SidebarProps {

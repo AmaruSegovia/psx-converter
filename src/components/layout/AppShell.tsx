@@ -20,7 +20,6 @@ import { BeforeAfterSlider } from '@/components/preview/BeforeAfterSlider';
 import { FACTORY_PRESETS } from '@/data/factoryPresets';
 import { setPendingHistoryLabel } from '@/hooks/useUndoRedo';
 import { DonateButton } from '@/components/donate/DonateButton';
-import { DonatePava } from '@/components/donate/DonatePava';
 import type { ConverterSettings } from '@/types';
 
 const CAFECITO_URL = 'https://cafecito.app/amarusegovia';

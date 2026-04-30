@@ -39,12 +39,6 @@ const SCALE_EASE: [number, number, number, number] = [0.45, 0, 0.55, 1];
 // Rotate — wobble keyframes on arrival: tilt → overshoot → settle
 const ROTATE_DURATION = 0.85;
 const ROTATE_EASE: [number, number, number, number] = [0.45, 0, 0.55, 1];
-// Idle float
-const FLOAT_DURATION = 2.5;   // seconds per up-down cycle
-const FLOAT_AMPLITUDE = 2;    // px
-// Idle wave — saludo periódico para llamar atención cuando está en reposo
-const WAVE_PERIOD = 7;        // s entre cada wave (cuanto más alto, menos frecuente)
-const WAVE_ANGLE  = -12;      // grados de la rotación (negativo = se inclina a la izquierda)
 // Glow
 const GLOW_DURATION = 0.5;
 // ────────────────────────────────────────────────────────────────────────────

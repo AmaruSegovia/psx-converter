@@ -20,44 +20,6 @@ const sceneVariants = {
   },
 };
 
-const waterVariants = {
-  rest: { opacity: 0, pathLength: 0 },
-  hover: {
-    opacity: 1,
-    pathLength: 1,
-    transition: { delay: 0.45, duration: 0.4, ease: 'easeOut' as const },
-  },
-};
-
-const steamVariants = {
-  rest: { opacity: 0, y: 0, pathLength: 0 },
-  hover: (i: number) => ({
-    opacity: [0, 0.95, 0],
-    y: [0, -3, -7],
-    pathLength: [0, 1, 1],
-    transition: {
-      duration: 1.4,
-      repeat: Infinity,
-      delay: 0.7 + i * 0.18,
-      ease: 'easeOut' as const,
-    },
-  }),
-};
-
-const sparkleVariants = {
-  rest: { opacity: 0, scale: 0.4 },
-  hover: (i: number) => ({
-    opacity: [0, 1, 0],
-    scale: [0.4, 1.1, 0.4],
-    transition: {
-      duration: 1.0,
-      repeat: Infinity,
-      delay: 1.0 + i * 0.13,
-      ease: 'easeInOut' as const,
-    },
-  }),
-};
-
 const mateNudgeVariants = {
   rest: { rotate: 0, y: 0, scale: 1 },
   hover: {
