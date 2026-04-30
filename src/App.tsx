@@ -30,9 +30,8 @@ function App() {
       <Onboarding />
       <Toaster
         theme="dark"
-        position="bottom-center"
-        expand
-        visibleToasts={4}
+        position="top-center"
+        visibleToasts={1}
         gap={8}
         duration={2500}
         toastOptions={{
