@@ -192,6 +192,19 @@ export const translations = {
     'feedback.report': 'Report a bug',
     'feedback.reportTip': 'Opens a pre-filled GitHub issue with your current settings as context.',
 
+    // Donate (Cafecito / Matecito)
+    'donate.tooltip': 'If this tool helped you, consider inviting me a mate 🧉',
+    'donate.description': 'Help keep it free & ad-free',
+    'donate.credit': 'PSX Converter · made by Amaru ·',
+    'donate.creditQuestion': 'Did this tool help you?',
+    'donate.creditCta': 'Invite me a mate',
+    'donate.creditTooltip': 'Support the project on Cafecito',
+    'donate.compact': 'Matecito',
+    'donate.full': 'Share a mate',
+    'donate.toastTitle': 'Enjoying the converter?',
+    'donate.toastDescription': 'Share a mate to keep it ad-free.',
+    'donate.toastAction': 'Matecito 🧉',
+
     // History
     'sidebar.history': 'History',
     'sidebar.clearHistory': 'Clear history',
@@ -473,6 +486,18 @@ export const translations = {
 
     'feedback.report': 'Reportar un bug',
     'feedback.reportTip': 'Abre un issue de GitHub pre-cargado con tu configuración actual como contexto.',
+
+    'donate.tooltip': 'Si esta herramienta te sirvió, podés invitarme un mate 🧉',
+    'donate.description': 'Ayudá a mantenerla gratis',
+    'donate.credit': 'PSX Converter · hecho por Amaru ·',
+    'donate.creditQuestion': '¿Te sirvió la herramienta?',
+    'donate.creditCta': 'Invitame un mate',
+    'donate.creditTooltip': 'Apoyá el proyecto en Cafecito',
+    'donate.compact': 'Matecito',
+    'donate.full': 'Invitame unos mates',
+    'donate.toastTitle': '¿Te gustó el convertidor?',
+    'donate.toastDescription': 'Invitame unos mates para mantenerla sin ads.',
+    'donate.toastAction': 'Matecito 🧉',
 
     'sidebar.history': 'Historial',
     'sidebar.clearHistory': 'Limpiar historial',

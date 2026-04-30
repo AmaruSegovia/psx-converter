@@ -20,6 +20,7 @@ const TabPalette = lazy(() =>
 import { TabColors } from '@/components/controls/TabColors';
 import { TabEffects } from '@/components/controls/TabEffects';
 import { PresetSaveDialog, PresetLoadDialog } from '@/components/presets/PresetManager';
+import { DonateButton, CAFECITO_URL } from '@/components/donate/DonateButton';
 import { useUndoRedo, setPendingHistoryLabel } from '@/hooks/useUndoRedo';
 
 interface SidebarProps {
@@ -67,8 +68,8 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
         `}
       >
       <div className="flex flex-col px-3 pt-2 pb-1.5 border-b border-border gap-1">
-        {/* Row 1: presets + share */}
-        <div className="flex items-center gap-1">
+        {/* Row 1: presets + share + donate (donate at far right with breathing room) */}
+        <div className="flex items-center gap-1.5">
           <PresetLoadDialog />
           <PresetSaveDialog />
           <div className="flex-1" />
@@ -215,6 +216,24 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
           </div>
         </ScrollArea>
       </Tabs>
+      {/* Donate footer — pitch personal 2 líneas, toda la card clickeable */}
+      <a
+        href={CAFECITO_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={t('donate.creditTooltip')}
+        aria-label={t('donate.creditTooltip')}
+        className="group border-t border-border px-3 py-2.5 shrink-0 text-center select-none flex flex-col items-center gap-0.5 no-underline transition-all duration-200 hover:bg-violet-500/5 hover:-translate-y-px"
+      >
+        <span className="text-[11px] text-muted-foreground/60 group-hover:text-muted-foreground/80 transition-colors">
+          {t('donate.creditQuestion')}
+        </span>
+        <span className="text-xs font-medium text-foreground/85 group-hover:text-violet-300 transition-colors inline-flex items-center gap-1.5">
+          <span aria-hidden="true">🧉</span>
+          <span className="group-hover:underline underline-offset-2 decoration-violet-400/60">{t('donate.creditCta')}</span>
+          <span className="inline-block transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">→</span>
+        </span>
+      </a>
       </aside>
     </>
   );
