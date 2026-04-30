@@ -146,7 +146,7 @@ export function AppShell() {
         exportPNG(finalCanvas, filename);
       }
       toast.success(t('toast.exported'));
-      pulseDonate();
+      setTimeout(pulseDonate, 500);
     } catch (err) {
       console.error('Export failed:', err);
       toast.error(t('toast.processingFailed'));
