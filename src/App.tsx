@@ -4,11 +4,12 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Onboarding } from '@/components/Onboarding';
 import { MotionConfig } from 'framer-motion';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
-import { Toaster, toast } from 'sonner';
+import { Toaster } from 'sonner';
 import { consumeShareHashFromUrl } from '@/lib/shareLink';
 import { useConverterStore } from '@/store/converterStore';
 import { setPendingHistoryLabel } from '@/hooks/useUndoRedo';
 import { t } from '@/lib/i18n';
+import { setHeaderStatus } from '@/lib/headerStatus';
 
 function App() {
   const reduce = useReducedMotion();
@@ -20,7 +21,7 @@ function App() {
     if (incoming) {
       setPendingHistoryLabel('Shared link');
       useConverterStore.getState().loadSettings(incoming);
-      toast.success(t('toast.linkLoaded'));
+      setHeaderStatus(t('toast.linkLoaded'));
     }
   }, []);
   return (

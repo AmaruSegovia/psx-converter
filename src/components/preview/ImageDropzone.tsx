@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { setHeaderStatus } from '@/lib/headerStatus';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useConverterStore } from '@/store/converterStore';
 import { loadImage } from '@/lib/imageProcessing';
@@ -74,7 +75,7 @@ export function ImageDropzone() {
           updateSettings({ width: 100, height: 100 });
         }
 
-        toast.success(`${t('toast.imageLoaded')} (${w} x ${h}px)`);
+        setHeaderStatus(`${t('toast.imageLoaded')} (${w} x ${h}px)`);
       } catch {
         toast.error(t('dropzone.loadError'));
       } finally {
@@ -154,7 +155,7 @@ export function ImageDropzone() {
           }
 
           updateSettings(suggested);
-          toast.success(t('dropzone.exampleLoaded'));
+          setHeaderStatus(t('dropzone.exampleLoaded'));
         } catch {
           toast.error(t('dropzone.exampleError'));
         } finally {

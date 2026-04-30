@@ -548,25 +548,23 @@ export function AppShell() {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <AnimatePresence mode="wait">
+          <motion.div
+            className="flex items-center gap-1.5 text-[11px]"
+            animate={{ opacity: (isProcessing || headerMsg) ? 1 : 0 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            aria-live="polite"
+          >
             {isProcessing ? (
-              <motion.div key="processing"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <div className="w-3 h-3 border-[1.5px] border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="w-3 h-3 border-[1.5px] border-primary border-t-transparent rounded-full animate-spin" />
                 {t('header.processing')}
-              </motion.div>
+              </span>
             ) : headerMsg ? (
-              <motion.span key={headerMsg.text}
-                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.18 }}
-                className={`text-[11px] ${headerMsg.type === 'warning' ? 'text-amber-400/80' : 'text-muted-foreground/70'}`}
-              >
+              <span className={headerMsg.type === 'warning' ? 'text-amber-400/80' : 'text-muted-foreground/70'}>
                 {headerMsg.text}
-              </motion.span>
+              </span>
             ) : null}
-          </AnimatePresence>
+          </motion.div>
 
           {sourceImage && (
             <Button size="sm" variant="ghost" className="text-[11px] h-7 px-2 gap-1 text-muted-foreground hover:text-destructive"
