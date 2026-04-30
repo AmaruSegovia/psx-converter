@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ChangedDot } from '@/components/ui/changed-dot';
 import { useConverterStore } from '@/store/converterStore';
@@ -21,6 +21,7 @@ import { TabColors } from '@/components/controls/TabColors';
 import { TabEffects } from '@/components/controls/TabEffects';
 import { PresetSaveDialog, PresetLoadDialog } from '@/components/presets/PresetManager';
 import { CAFECITO_URL } from '@/components/donate/DonateButton';
+import { subscribeDonatePulse } from '@/components/donate/donateState';
 import { useUndoRedo, setPendingHistoryLabel } from '@/hooks/useUndoRedo';
 
 interface SidebarProps {
@@ -40,6 +41,22 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
   const { undo, redo, historyIndex, historyLength, navigateHistory, clearHistory, getEntryLabel } = useUndoRedo();
   const currentLabel = historyIndex >= 0 ? getEntryLabel(historyIndex) : '';
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [donatePulse, setDonatePulse] = useState(false);
+
+  useEffect(() => {
+    let timer: number | undefined;
+    const unsub = subscribeDonatePulse(() => {
+      setDonatePulse(false);
+      // next frame to retrigger animation if pulse fires while still active
+      requestAnimationFrame(() => setDonatePulse(true));
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setDonatePulse(false), 1800);
+    });
+    return () => {
+      unsub();
+      window.clearTimeout(timer);
+    };
+  }, []);
 
   const handleResetConfirm = () => {
     setPendingHistoryLabel('Reset');
@@ -223,7 +240,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
         rel="noopener noreferrer"
         title={t('donate.creditTooltip')}
         aria-label={t('donate.creditTooltip')}
-        className="group border-t border-border px-3 py-2.5 shrink-0 text-center select-none flex flex-col items-center gap-0.5 no-underline transition-all duration-200 hover:bg-violet-500/5 hover:-translate-y-px"
+        className={`group border-t border-border px-3 py-2.5 shrink-0 text-center select-none flex flex-col items-center gap-0.5 no-underline transition-all duration-200 hover:bg-violet-500/5 hover:-translate-y-px ${donatePulse ? 'donate-pulse' : ''}`}
       >
         <span className="text-[11px] text-muted-foreground/60 group-hover:text-muted-foreground/80 transition-colors">
           {t('donate.creditQuestion')}

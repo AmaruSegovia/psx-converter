@@ -15,3 +15,17 @@ export function subscribeDonateTarget(fn: Listener): () => void {
     listeners.delete(fn);
   };
 }
+
+type PulseListener = () => void;
+const pulseListeners = new Set<PulseListener>();
+
+export function pulseDonate(): void {
+  pulseListeners.forEach((fn) => fn());
+}
+
+export function subscribeDonatePulse(fn: PulseListener): () => void {
+  pulseListeners.add(fn);
+  return () => {
+    pulseListeners.delete(fn);
+  };
+}

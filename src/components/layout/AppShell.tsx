@@ -19,10 +19,8 @@ import { PreviewCanvas } from '@/components/preview/PreviewCanvas';
 import { BeforeAfterSlider } from '@/components/preview/BeforeAfterSlider';
 import { FACTORY_PRESETS } from '@/data/factoryPresets';
 import { setPendingHistoryLabel } from '@/hooks/useUndoRedo';
-import { DonateButton } from '@/components/donate/DonateButton';
+import { pulseDonate } from '@/components/donate/donateState';
 import type { ConverterSettings } from '@/types';
-
-const CAFECITO_URL = 'https://cafecito.app/amarusegovia';
 
 export function AppShell() {
   useImageProcessor();
@@ -148,21 +146,7 @@ export function AppShell() {
         exportPNG(finalCanvas, filename);
       }
       toast.success(t('toast.exported'));
-      try {
-        if (!sessionStorage.getItem('psx-donate-shown')) {
-          sessionStorage.setItem('psx-donate-shown', '1');
-          setTimeout(() => {
-            toast(t('donate.toastTitle'), {
-              description: t('donate.toastDescription'),
-              duration: 8000,
-              action: {
-                label: t('donate.toastAction'),
-                onClick: () => window.open(CAFECITO_URL, '_blank', 'noopener,noreferrer'),
-              },
-            });
-          }, 1200);
-        }
-      } catch { /* sessionStorage unavailable, skip silently */ }
+      pulseDonate();
     } catch (err) {
       console.error('Export failed:', err);
       toast.error(t('toast.processingFailed'));
@@ -834,7 +818,6 @@ export function AppShell() {
               </svg>
               {t('feedback.report')}
             </Button>
-            <DonateButton variant="full" />
           </div>
         </DialogContent>
       </Dialog>
