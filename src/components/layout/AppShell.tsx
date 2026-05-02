@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 import { useConverterStore } from '@/store/converterStore';
 import { useImageProcessor } from '@/hooks/useImageProcessor';
 import { useTranslation } from '@/hooks/useTranslation';
-import { exportPNG, loadImage, processFullPipeline, upscaleNearestNeighbor } from '@/lib/imageProcessing';
+import { exportPNG, loadImage, processFullPipeline, resizeImage, EXPORT_PIXEL_LIMIT } from '@/lib/imageProcessing';
+import { ExportResizeDialog } from '@/components/export/ExportResizeDialog';
 import { buildIndexedPng, downloadIndexedPng } from '@/lib/exportIndexedPng';
 import { fitDimsToSource } from '@/lib/aspectFit';
 import { subscribeCanvas, getResultDimensions } from '@/lib/canvasBus';
@@ -12,7 +13,6 @@ import { onWorkerCrash } from '@/lib/quantizationClient';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sidebar } from './Sidebar';
 import { ImageDropzone } from '@/components/preview/ImageDropzone';
 import { PreviewCanvas } from '@/components/preview/PreviewCanvas';
@@ -34,6 +34,9 @@ export function AppShell() {
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showBatchExport, setShowBatchExport] = useState(false);
+  const [showMobileActions, setShowMobileActions] = useState(false);
+  const [showResizeDialog, setShowResizeDialog] = useState(false);
+  const resizeBtnRef = useRef<HTMLButtonElement>(null);
   const [batchSizes, setBatchSizesRaw] = useState<number[]>(() => {
     try {
       const raw = localStorage.getItem('psx-batch-sizes');
@@ -80,22 +83,15 @@ export function AppShell() {
   // refresh.
   const [exportScale, setExportScaleRaw] = useState<number>(() => {
     try {
-      const v = parseInt(localStorage.getItem('psx-export-scale') || '1', 10);
-      return Number.isFinite(v) ? Math.max(1, Math.min(32, v)) : 1;
+      const v = parseFloat(localStorage.getItem('psx-export-scale') || '1');
+      return Number.isFinite(v) ? Math.max(1, Math.min(16, v)) : 1;
     } catch { return 1; }
   });
   const setExportScale = useCallback((n: number) => {
-    const clamped = Math.max(1, Math.min(32, Math.floor(n)));
+    const clamped = Math.max(1, Math.min(16, n));
     setExportScaleRaw(clamped);
     try { localStorage.setItem('psx-export-scale', String(clamped)); } catch { /* private mode */ }
   }, []);
-  const [customScaleMode, setCustomScaleMode] = useState(false);
-  const [customScaleInput, setCustomScaleInput] = useState('');
-
-  const SCALE_PRESETS = [1, 2, 3, 4, 6, 8, 10, 16];
-  const isPresetScale = SCALE_PRESETS.includes(exportScale);
-
-  const EXPORT_PIXEL_LIMIT = 50_000_000;
 
   const [exportIndexed, setExportIndexedRaw] = useState<boolean>(() => {
     try { return localStorage.getItem('psx-export-indexed') === 'true'; }
@@ -105,12 +101,6 @@ export function AppShell() {
     setExportIndexedRaw(v);
     try { localStorage.setItem('psx-export-indexed', String(v)); } catch { /* private mode */ }
   }, []);
-
-  const commitCustomScale = useCallback(() => {
-    const n = parseInt(customScaleInput, 10);
-    if (Number.isFinite(n)) setExportScale(n);
-    setCustomScaleMode(false);
-  }, [customScaleInput, setExportScale]);
 
   // --- Smart filename ---
   const getExportFilename = useCallback((w?: number, h?: number) => {
@@ -142,12 +132,14 @@ export function AppShell() {
     const settings = useConverterStore.getState().settings;
     try {
       const { resultCanvas } = await processFullPipeline(source, settings);
-      const targetPixels = resultCanvas.width * resultCanvas.height * exportScale * exportScale;
-      if (targetPixels > EXPORT_PIXEL_LIMIT) {
+      const fw = Math.max(1, Math.round(resultCanvas.width * exportScale));
+      const fh = Math.max(1, Math.round(resultCanvas.height * exportScale));
+      if (fw * fh > EXPORT_PIXEL_LIMIT) {
         toast.error(t('toast.exportTooLarge'));
         return;
       }
-      const finalCanvas = upscaleNearestNeighbor(resultCanvas, exportScale);
+      const finalCanvas = (fw === resultCanvas.width && fh === resultCanvas.height)
+        ? resultCanvas : resizeImage(resultCanvas, fw, fh, 'nearest');
       const filename = getExportFilename(finalCanvas.width, finalCanvas.height);
       const palette = useConverterStore.getState().generatedPalette;
       const canIndexed = exportIndexed && palette.length > 0 && palette.length <= 256;
@@ -175,11 +167,13 @@ export function AppShell() {
       // in Safari when await between click and clipboard.write takes too long.
       const blobPromise = processFullPipeline(source, settings).then(
         ({ resultCanvas }) => {
-          const targetPixels = resultCanvas.width * resultCanvas.height * exportScale * exportScale;
-          if (targetPixels > EXPORT_PIXEL_LIMIT) {
+          const fw = Math.max(1, Math.round(resultCanvas.width * exportScale));
+          const fh = Math.max(1, Math.round(resultCanvas.height * exportScale));
+          if (fw * fh > EXPORT_PIXEL_LIMIT) {
             throw new Error('export-too-large');
           }
-          const finalCanvas = upscaleNearestNeighbor(resultCanvas, exportScale);
+          const finalCanvas = (fw === resultCanvas.width && fh === resultCanvas.height)
+            ? resultCanvas : resizeImage(resultCanvas, fw, fh, 'nearest');
           return new Promise<Blob>((res, rej) =>
             finalCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png')
           );
@@ -216,12 +210,14 @@ export function AppShell() {
           const h = aspect >= 1 ? Math.max(1, Math.round(size / aspect)) : size;
           const batchSettings = { ...settings, width: w, height: h, sizeMode: 'absolute' as const };
           const { resultCanvas } = await processFullPipeline(source, batchSettings);
-          const targetPixels = resultCanvas.width * resultCanvas.height * exportScale * exportScale;
-          if (targetPixels > EXPORT_PIXEL_LIMIT) {
+          const fw = Math.max(1, Math.round(resultCanvas.width * exportScale));
+          const fh = Math.max(1, Math.round(resultCanvas.height * exportScale));
+          if (fw * fh > EXPORT_PIXEL_LIMIT) {
             failedSizes.push(size);
             continue;
           }
-          const finalCanvas = upscaleNearestNeighbor(resultCanvas, exportScale);
+          const finalCanvas = (fw === resultCanvas.width && fh === resultCanvas.height)
+            ? resultCanvas : resizeImage(resultCanvas, fw, fh, 'nearest');
           const filename = getExportFilename(finalCanvas.width, finalCanvas.height);
           const palette = useConverterStore.getState().generatedPalette;
           const canIndexed = exportIndexed && palette.length > 0 && palette.length <= 256;
@@ -338,7 +334,7 @@ export function AppShell() {
   // --- Effects ---
   const [resultDims, setResultDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const exportTooLarge = resultDims.w > 0 &&
-    resultDims.w * resultDims.h * exportScale * exportScale > EXPORT_PIXEL_LIMIT;
+    Math.round(resultDims.w * exportScale) * Math.round(resultDims.h * exportScale) > EXPORT_PIXEL_LIMIT;
   useEffect(() => {
     return subscribeCanvas(() => {
       const { w, h } = getResultDimensions();
@@ -528,7 +524,7 @@ export function AppShell() {
 
           <button
             onClick={() => setLocale(locale === 'en' ? 'es' : 'en')}
-            className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground transition-colors ml-1 uppercase font-mono"
+            className="hidden sm:inline-flex text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground transition-colors ml-1 uppercase font-mono"
             title={locale === 'en' ? 'Cambiar a Español' : 'Switch to English'}
             aria-label={locale === 'en' ? 'Cambiar a Español' : 'Switch to English'}
           >
@@ -538,7 +534,7 @@ export function AppShell() {
           <button
             data-tour="shortcuts"
             onClick={() => setShowShortcuts(true)}
-            className="text-[10px] w-5 h-5 rounded border border-border text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center"
+            className="hidden sm:flex text-[10px] w-5 h-5 rounded border border-border text-muted-foreground hover:text-foreground transition-colors items-center justify-center"
             title={t('shortcuts.help')}
             aria-label={t('shortcuts.help')}
           >
@@ -567,7 +563,7 @@ export function AppShell() {
           </motion.div>
 
           {sourceImage && (
-            <Button size="sm" variant="ghost" className="text-[11px] h-7 px-2 gap-1 text-muted-foreground hover:text-destructive"
+            <Button size="sm" variant="ghost" className="hidden sm:inline-flex text-[11px] h-7 px-2 gap-1 text-muted-foreground hover:text-destructive"
               onClick={() => setShowRemoveDialog(true)} title={t('header.removeTitle')} aria-label={t('header.removeTitle')}>
               <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
@@ -577,7 +573,7 @@ export function AppShell() {
           )}
 
           {hasResult && (
-            <Button size="sm" variant="ghost" className="text-[11px] h-7 px-2 gap-1 text-muted-foreground hover:text-foreground"
+            <Button size="sm" variant="ghost" className="hidden sm:inline-flex text-[11px] h-7 px-2 gap-1 text-muted-foreground hover:text-foreground"
               onClick={handleCopy} title={t('header.copyTitle')} aria-label={t('header.copyTitle')}>
               <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
@@ -587,7 +583,7 @@ export function AppShell() {
           )}
 
           {hasResult && (
-            <Button size="sm" variant="ghost" className="text-[11px] h-7 px-2 text-muted-foreground hover:text-foreground"
+            <Button size="sm" variant="ghost" className="hidden sm:inline-flex text-[11px] h-7 px-2 text-muted-foreground hover:text-foreground"
               onClick={() => setShowBatchExport(true)} title={t('export.batch')} aria-label={t('export.batch')}>
               <svg aria-hidden="true" focusable="false" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
@@ -596,87 +592,26 @@ export function AppShell() {
           )}
 
           {hasResult && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-muted-foreground hidden sm:inline">{t('export.scale')}:</span>
-              {customScaleMode ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min={1}
-                    max={32}
-                    step={1}
-                    value={customScaleInput}
-                    onChange={(e) => setCustomScaleInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitCustomScale();
-                      else if (e.key === 'Escape') setCustomScaleMode(false);
-                    }}
-                    onBlur={commitCustomScale}
-                    aria-label={t('export.scaleCustomLabel')}
-                    className="h-7 w-14 px-2 text-[11px] rounded border border-border bg-background"
-                    autoFocus
-                  />
-                  <span className="text-[11px] text-muted-foreground">×</span>
-                  {resultDims.w > 0 && (() => {
-                    const m = Math.max(1, Math.min(32, parseInt(customScaleInput, 10) || 1));
-                    return (
-                      <span className="text-[10px] text-muted-foreground/70 hidden md:inline">
-                        → {resultDims.w * m}×{resultDims.h * m}
-                      </span>
-                    );
-                  })()}
-                </div>
-              ) : (
-                <Select
-                  value={isPresetScale ? String(exportScale) : 'custom'}
-                  onValueChange={(v) => {
-                    if (!v) return;
-                    if (v === 'custom') {
-                      setCustomScaleInput(String(exportScale));
-                      setCustomScaleMode(true);
-                    } else {
-                      setExportScale(parseInt(v, 10));
-                    }
-                  }}
-                >
-                  <SelectTrigger
-                    className="h-7 text-[11px] px-2 gap-1"
-                    title={t('export.scale')}
-                    aria-label={t('export.scale')}
-                  >
-                    <SelectValue>
-                      {isPresetScale && resultDims.w > 0 ? (
-                        <span className="inline-flex items-baseline gap-1">
-                          <span>{exportScale}×</span>
-                          <span className="text-[10px] text-muted-foreground/85">
-                            {resultDims.w * exportScale}×{resultDims.h * exportScale}
-                          </span>
-                        </span>
-                      ) : (
-                        `${exportScale}×`
-                      )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SCALE_PRESETS.map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {resultDims.w > 0 ? (
-                          <span className="inline-flex items-baseline gap-1.5">
-                            <span>{n}×</span>
-                            <span className="text-[10px] text-muted-foreground/85">
-                              {resultDims.w * n}×{resultDims.h * n}
-                            </span>
-                          </span>
-                        ) : (
-                          `${n}×`
-                        )}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="custom">{t('export.scaleCustom')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+            <button
+              ref={resizeBtnRef}
+              onClick={() => setShowResizeDialog((v) => !v)}
+              className="hidden sm:inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[11px] bg-secondary hover:bg-secondary/80 transition-colors"
+              aria-label={t('resize.button')}
+              data-tour="resize"
+            >
+              <svg aria-hidden="true" focusable="false" className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M21 21H3M21 3v18M3 3h18" />
+                <path d="M3 3l18 18" />
+              </svg>
+              <span>
+                {Number.isInteger(exportScale) ? exportScale : exportScale.toFixed(2)}×
+                {resultDims.w > 0 && (
+                  <span className="text-muted-foreground ml-1">
+                    {Math.round(resultDims.w * exportScale)}×{Math.round(resultDims.h * exportScale)}
+                  </span>
+                )}
+              </span>
+            </button>
           )}
 
           {hasResult && (() => {
@@ -685,7 +620,7 @@ export function AppShell() {
             const tipKey = canIndexed ? 'export.indexedTip' : 'export.indexedDisabled';
             return (
               <label
-                className={`flex items-center gap-1 text-[10px] select-none ${canIndexed ? 'text-muted-foreground cursor-pointer' : 'text-muted-foreground/40 cursor-not-allowed'}`}
+                className={`hidden sm:flex items-center gap-1 text-[10px] select-none ${canIndexed ? 'text-muted-foreground cursor-pointer' : 'text-muted-foreground/40 cursor-not-allowed'}`}
                 title={t(tipKey)}
               >
                 <Checkbox
@@ -697,6 +632,20 @@ export function AppShell() {
               </label>
             );
           })()}
+
+          <button
+            data-tour="kebab"
+            onClick={() => setShowMobileActions(true)}
+            className="sm:hidden w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors flex items-center justify-center"
+            title={t('mobile.actionsOpen')}
+            aria-label={t('mobile.actionsOpen')}
+          >
+            <svg aria-hidden="true" focusable="false" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="5" r="1.6" />
+              <circle cx="12" cy="12" r="1.6" />
+              <circle cx="12" cy="19" r="1.6" />
+            </svg>
+          </button>
 
           <Button
             size="sm"
@@ -864,6 +813,104 @@ export function AppShell() {
         </DialogContent>
       </Dialog>
 
+      {/* Mobile actions menu — only used at <sm. Mirrors header buttons hidden on mobile. */}
+      <Dialog open={showMobileActions} onOpenChange={setShowMobileActions}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader><DialogTitle>{t('mobile.actionsTitle')}</DialogTitle></DialogHeader>
+          <div className="flex flex-col gap-1">
+            {sourceImage && (
+              <button
+                onClick={() => { setShowMobileActions(false); setShowRemoveDialog(true); }}
+                className="flex items-center gap-3 h-11 px-3 rounded text-[13px] text-foreground/85 hover:bg-destructive/10 hover:text-destructive transition-colors text-left"
+              >
+                <svg aria-hidden="true" focusable="false" className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                </svg>
+                {t('header.remove')}
+              </button>
+            )}
+            {hasResult && (
+              <button
+                onClick={() => { setShowMobileActions(false); handleCopy(); }}
+                className="flex items-center gap-3 h-11 px-3 rounded text-[13px] text-foreground/85 hover:bg-muted/60 transition-colors text-left"
+              >
+                <svg aria-hidden="true" focusable="false" className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </svg>
+                {t('header.copy')}
+              </button>
+            )}
+            {hasResult && (
+              <button
+                onClick={() => { setShowMobileActions(false); setShowBatchExport(true); }}
+                className="flex items-center gap-3 h-11 px-3 rounded text-[13px] text-foreground/85 hover:bg-muted/60 transition-colors text-left"
+              >
+                <svg aria-hidden="true" focusable="false" className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+                </svg>
+                {t('export.batch')}
+              </button>
+            )}
+            {hasResult && (
+              <button
+                onClick={() => { setShowMobileActions(false); setShowResizeDialog(true); }}
+                className="flex items-center justify-between gap-2 h-11 px-3 rounded text-[13px] text-foreground/85 hover:bg-muted/60 transition-colors text-left"
+                aria-label={t('resize.button')}
+              >
+                <span>{t('resize.button')}</span>
+                <span className="text-[12px] text-muted-foreground font-mono">
+                  {Number.isInteger(exportScale) ? exportScale : exportScale.toFixed(2)}×{resultDims.w > 0 && ` (${Math.round(resultDims.w * exportScale)}×${Math.round(resultDims.h * exportScale)})`}
+                </span>
+              </button>
+            )}
+            {hasResult && (() => {
+              const palette = useConverterStore.getState().generatedPalette;
+              const canIndexed = palette.length > 0 && palette.length <= 256;
+              const tipKey = canIndexed ? 'export.indexedTip' : 'export.indexedDisabled';
+              return (
+                <label
+                  className={`flex items-center justify-between gap-2 h-11 px-3 rounded text-[13px] select-none ${canIndexed ? 'text-foreground/85 cursor-pointer hover:bg-muted/60' : 'text-muted-foreground/40 cursor-not-allowed'}`}
+                  title={t(tipKey)}
+                >
+                  <span>PNG-8</span>
+                  <Checkbox
+                    checked={exportIndexed && canIndexed}
+                    disabled={!canIndexed}
+                    onCheckedChange={(v) => setExportIndexed(!!v)}
+                  />
+                </label>
+              );
+            })()}
+            <button
+              onClick={() => { setShowMobileActions(false); setShowShortcuts(true); }}
+              className="flex items-center gap-3 h-11 px-3 rounded text-[13px] text-foreground/85 hover:bg-muted/60 transition-colors text-left"
+            >
+              <span className="w-4 h-4 shrink-0 rounded border border-border text-[10px] flex items-center justify-center font-mono">?</span>
+              {t('mobile.help')}
+            </button>
+            <button
+              onClick={() => setLocale(locale === 'en' ? 'es' : 'en')}
+              className="flex items-center justify-between gap-2 h-11 px-3 rounded text-[13px] text-foreground/85 hover:bg-muted/60 transition-colors"
+            >
+              <span>{t('mobile.locale')}</span>
+              <span className="text-[11px] uppercase font-mono px-2 py-0.5 rounded border border-border">
+                {locale === 'en' ? 'EN' : 'ES'}
+              </span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ExportResizeDialog
+        open={showResizeDialog}
+        onOpenChange={setShowResizeDialog}
+        scale={exportScale}
+        onScaleChange={setExportScale}
+        baseWidth={resultDims.w}
+        baseHeight={resultDims.h}
+        anchorEl={resizeBtnRef.current}
+      />
+
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar isMobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />
@@ -933,8 +980,8 @@ export function AppShell() {
 
           {sourceImage && (
             <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-              className="flex items-center justify-between px-4 h-10 border-t border-border bg-card/50 shrink-0">
-              <div className="flex items-center gap-1">
+              className="flex items-center justify-between gap-2 px-4 h-10 border-t border-border bg-card/50 shrink-0 overflow-x-auto whitespace-nowrap">
+              <div className="flex items-center gap-1 shrink-0">
                 {hasResult && (
                   <div className="flex bg-muted/50 rounded-md p-0.5 gap-0.5">
                     <button className={`text-[11px] px-3 py-1.5 rounded transition-colors ${viewMode === 'slider' ? 'bg-primary/15 text-primary font-medium' : 'text-muted-foreground hover:text-foreground'}`}
@@ -944,9 +991,9 @@ export function AppShell() {
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 shrink-0">
                 <div className="flex items-center gap-1" role="group" aria-label={t('preview.bgLabel')}>
-                  <span className="text-[10px] text-muted-foreground/60 mr-1">{t('preview.bgLabel')}</span>
+                  <span className="hidden sm:inline text-[10px] text-muted-foreground/60 mr-1">{t('preview.bgLabel')}</span>
                   {(['checkerboard', 'black', 'white', 'custom'] as const).map((b) => (
                     <button
                       key={b}
@@ -954,7 +1001,7 @@ export function AppShell() {
                       title={t(`preview.bg.${b}` as const)}
                       aria-label={t(`preview.bg.${b}` as const)}
                       aria-pressed={previewBg === b}
-                      className={`w-5 h-5 rounded border transition-colors ${
+                      className={`w-6 h-6 rounded border transition-colors ${
                         previewBg === b ? 'border-primary ring-1 ring-primary/50' : 'border-border/50 hover:border-border'
                       }`}
                       style={
@@ -971,7 +1018,7 @@ export function AppShell() {
                       type="color"
                       value={previewBgCustom}
                       onChange={(e) => setPreviewBgCustom(e.target.value)}
-                      className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent"
+                      className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent"
                       aria-label={t('preview.bg.custom')}
                     />
                   )}
@@ -980,7 +1027,7 @@ export function AppShell() {
                     title={t('preview.bg.image')}
                     aria-label={t('preview.bg.image')}
                     aria-pressed={previewBg === 'image'}
-                    className={`w-5 h-5 rounded border transition-colors flex items-center justify-center text-muted-foreground ${
+                    className={`w-6 h-6 rounded border transition-colors flex items-center justify-center text-muted-foreground ${
                       previewBg === 'image' ? 'border-primary ring-1 ring-primary/50' : 'border-border/50 hover:border-border'
                     }`}
                     style={previewBgImage && previewBg === 'image'
@@ -1024,7 +1071,7 @@ export function AppShell() {
                     aria-hidden="true"
                   />
                 </div>
-                <div className="text-[11px] text-muted-foreground/50 font-mono">
+                <div className="hidden sm:block text-[11px] text-muted-foreground/50 font-mono">
                   {useConverterStore.getState().originalWidth} x {useConverterStore.getState().originalHeight}px
                 </div>
               </div>

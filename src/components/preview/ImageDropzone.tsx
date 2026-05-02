@@ -188,7 +188,7 @@ export function ImageDropzone() {
         whileHover={isLoading ? undefined : { scale: 1.02 }}
         className={`
           flex flex-col items-center justify-center gap-4
-          w-[340px] h-[300px] rounded-xl
+          w-full max-w-[340px] mx-4 h-[300px] rounded-xl
           border-2 border-dashed transition-colors duration-200
           bg-card/60 backdrop-blur-sm
           ${isLoading

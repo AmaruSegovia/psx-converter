@@ -6,6 +6,12 @@ export const translations = {
     'header.remove': 'Remove',
     'header.removeTitle': 'Remove image',
 
+    // Mobile actions menu
+    'mobile.actionsTitle': 'Actions',
+    'mobile.actionsOpen': 'More actions',
+    'mobile.locale': 'Language',
+    'mobile.help': 'Shortcuts & help',
+
     // Remove dialog
     'remove.title': 'Remove image?',
     'remove.description': 'All current edits will be lost. This cannot be undone.',
@@ -224,9 +230,17 @@ export const translations = {
     'export.download': 'Download All',
     // Export scale (nearest-neighbor upscale on export)
     'export.scale': 'Export scale',
-    'export.scaleCustom': 'Custom…',
-    'export.scaleCustomLabel': 'Multiplier (1–32)',
     'export.indexed': 'PNG-8 (indexed)',
+    // Resize dialog
+    'resize.title': 'Resize export',
+    'resize.scale': 'Scale',
+    'resize.width': 'Width',
+    'resize.height': 'Height',
+    'resize.output': 'Output',
+    'resize.tooLarge': 'Image too large (>50MP)',
+    'resize.apply': 'Apply',
+    'resize.cancel': 'Cancel',
+    'resize.button': 'Resize',
     'export.indexedTip': 'Smaller file size, palette intact. Falls back to PNG-24 if encoding fails.',
     'export.indexedDisabled': 'Generate a palette first to enable indexed PNG.',
     'toast.zipExported': 'ZIP exported',
@@ -316,6 +330,12 @@ export const translations = {
     'header.export': 'Exportar PNG',
     'header.remove': 'Eliminar',
     'header.removeTitle': 'Eliminar imagen',
+
+    // Mobile actions menu
+    'mobile.actionsTitle': 'Acciones',
+    'mobile.actionsOpen': 'Más acciones',
+    'mobile.locale': 'Idioma',
+    'mobile.help': 'Atajos y ayuda',
 
     'remove.title': '¿Eliminar imagen?',
     'remove.description': 'Se perderán todos los cambios actuales. Esta acción no se puede deshacer.',
@@ -511,9 +531,16 @@ export const translations = {
     'lospec.error.unknown': 'No se pudo cargar la paleta',
 
     'export.scale': 'Escala de exportación',
-    'export.scaleCustom': 'Personalizado…',
-    'export.scaleCustomLabel': 'Multiplicador (1–32)',
     'export.indexed': 'PNG-8 (indexado)',
+    'resize.title': 'Redimensionar export',
+    'resize.scale': 'Escala',
+    'resize.width': 'Ancho',
+    'resize.height': 'Alto',
+    'resize.output': 'Resultado',
+    'resize.tooLarge': 'Imagen muy grande (>50MP)',
+    'resize.apply': 'Aplicar',
+    'resize.cancel': 'Cancelar',
+    'resize.button': 'Redimensionar',
     'export.indexedTip': 'Archivo más liviano, paleta intacta. Si falla, exporta PNG-24 igual.',
     'export.indexedDisabled': 'Generá una paleta primero para habilitar PNG indexado.',
 

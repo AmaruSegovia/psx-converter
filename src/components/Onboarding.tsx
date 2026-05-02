@@ -25,7 +25,7 @@ const STEPS: TourStep[] = [
   { selectors: ['[data-tour="dropzone"]'], titleKey: 'tour.loadTitle', bodyKey: 'tour.loadBody', prefer: 'center' },
   { selectors: ['[data-tour="sidebar"]', '[data-tour="sidebar-toggle"]'], titleKey: 'tour.settingsTitle', bodyKey: 'tour.settingsBody', prefer: 'right' },
   { selectors: ['[data-tour="export"]'], titleKey: 'tour.exportTitle', bodyKey: 'tour.exportBody', prefer: 'bottom' },
-  { selectors: ['[data-tour="shortcuts"]'], titleKey: 'tour.shortcutsTitle', bodyKey: 'tour.shortcutsBody', prefer: 'bottom' },
+  { selectors: ['[data-tour="shortcuts"]', '[data-tour="kebab"]'], titleKey: 'tour.shortcutsTitle', bodyKey: 'tour.shortcutsBody', prefer: 'bottom' },
 ];
 
 const POPOVER_MARGIN = 14;

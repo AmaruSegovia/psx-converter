@@ -136,7 +136,7 @@ export function BeforeAfterSlider({ bg = 'checkerboard', bgColor = '#1a1525', bg
     <div
       ref={containerRef}
       className={`absolute inset-0 cursor-col-resize select-none ${bgClass}`}
-      style={bgStyle}
+      style={{ ...bgStyle, touchAction: 'none' }}
       role="slider"
       aria-label={t('view.compare')}
       aria-valuemin={0}

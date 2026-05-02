@@ -1,6 +1,8 @@
 import type { ConverterSettings } from '@/types';
 import { applyCRTFilter } from './crtFilter';
 
+export const EXPORT_PIXEL_LIMIT = 50_000_000;
+
 export function applyTransparency(
   imageData: ImageData,
   settings: Pick<ConverterSettings, 'transparencyMode' | 'alphaThreshold' | 'colorKeyHex'>
