@@ -197,29 +197,29 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps = 
         onValueChange={(v) => setActiveTab(v as typeof activeTab)}
         className="flex flex-col flex-1 overflow-hidden"
       >
-        <TabsList className="grid grid-cols-5 mx-4 mt-3 bg-muted/50 h-9">
+        <TabsList className="grid grid-cols-5 mx-4 mt-3 bg-muted/50 h-11">
           <TabsTrigger value="sample" aria-label={t('tab.resize')} className="relative sm:text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1 sm:pl-1 sm:pr-3">
-            <svg className="w-4 h-4 sm:w-3 sm:h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 15l6-6 4 4 8-8" /></svg>
+            <svg className="w-5 h-5 sm:w-3.5 sm:h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 15l6-6 4 4 8-8" /></svg>
             <span className="hidden sm:inline">{t('tab.resize')}</span>
             <ChangedDot show={changedTabs.sample} className={TAB_DOT_CLASSNAME} />
           </TabsTrigger>
           <TabsTrigger value="dither" aria-label={t('tab.dither')} className="relative sm:text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1 sm:pl-1 sm:pr-3">
-            <svg className="w-4 h-4 sm:w-3 sm:h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="6" cy="6" r="1.5" /><circle cx="18" cy="6" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="6" cy="18" r="1.5" /><circle cx="18" cy="18" r="1.5" /></svg>
+            <svg className="w-5 h-5 sm:w-3.5 sm:h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="6" cy="6" r="1.5" /><circle cx="18" cy="6" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="6" cy="18" r="1.5" /><circle cx="18" cy="18" r="1.5" /></svg>
             <span className="hidden sm:inline">{t('tab.dither')}</span>
             <ChangedDot show={changedTabs.dither} className={TAB_DOT_CLASSNAME} />
           </TabsTrigger>
           <TabsTrigger value="palette" aria-label={t('tab.palette')} className="relative sm:text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1 sm:pl-1 sm:pr-3">
-            <svg className="w-4 h-4 sm:w-3 sm:h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="8" r="2" /><circle cx="8" cy="14" r="2" /><circle cx="16" cy="14" r="2" /></svg>
+            <svg className="w-5 h-5 sm:w-3.5 sm:h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="8" r="2" /><circle cx="8" cy="14" r="2" /><circle cx="16" cy="14" r="2" /></svg>
             <span className="hidden sm:inline">{t('tab.palette')}</span>
             <ChangedDot show={changedTabs.palette} className={TAB_DOT_CLASSNAME} />
           </TabsTrigger>
           <TabsTrigger value="colors" aria-label={t('tab.colors')} className="relative sm:text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1 sm:pl-1 sm:pr-3">
-            <svg className="w-4 h-4 sm:w-3 sm:h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><path d="M12 2v20M2 12h20" /><path d="M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" /></svg>
+            <svg className="w-5 h-5 sm:w-3.5 sm:h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><path d="M12 2v20M2 12h20" /><path d="M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" /></svg>
             <span className="hidden sm:inline">{t('tab.colors')}</span>
             <ChangedDot show={changedTabs.colors} className={TAB_DOT_CLASSNAME} />
           </TabsTrigger>
           <TabsTrigger value="effects" aria-label={t('tab.effects')} className="relative sm:text-[10px] gap-1 data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-1 sm:pl-1 sm:pr-3">
-            <svg className="w-4 h-4 sm:w-3 sm:h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" /><path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75z" /><path d="M5 17l.5 1.5L7 19l-1.5.5L5 21l-.5-1.5L3 19l1.5-.5z" /></svg>
+            <svg className="w-5 h-5 sm:w-3.5 sm:h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" /><path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75z" /><path d="M5 17l.5 1.5L7 19l-1.5.5L5 21l-.5-1.5L3 19l1.5-.5z" /></svg>
             <span className="hidden sm:inline">{t('tab.effects')}</span>
             <ChangedDot show={changedTabs.effects} className={TAB_DOT_CLASSNAME} />
           </TabsTrigger>

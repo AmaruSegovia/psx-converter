@@ -501,7 +501,7 @@ export function AppShell() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
+    <div className="h-dvh flex flex-col bg-background text-foreground overflow-hidden">
       {/* Header */}
       <header className="flex items-center justify-between px-4 h-11 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-2">
@@ -636,7 +636,7 @@ export function AppShell() {
           <button
             data-tour="kebab"
             onClick={() => setShowMobileActions(true)}
-            className="sm:hidden w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors flex items-center justify-center"
+            className="sm:hidden w-8 h-8 rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors flex items-center justify-center mr-1"
             title={t('mobile.actionsOpen')}
             aria-label={t('mobile.actionsOpen')}
           >
